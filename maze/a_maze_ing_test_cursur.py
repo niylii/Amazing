@@ -1,7 +1,7 @@
 import curses
 import time
 
-def main(stdscr):
+def main(stdscr : curses.window):
     stdscr = curses.initscr()
     curses.start_color()
     curses.init_pair(1, curses.COLOR_RED, curses.COLOR_WHITE) 
@@ -30,13 +30,12 @@ def main(stdscr):
     height, width = stdscr.getmaxyx()
  #   if (height < 5 or width > 9):
 
-
     for y, row in enumerate(maze):
         for x, cell in enumerate(row):
             char = "  🗡  " if cell == 9 else "♟" if cell == 5 else "X" if cell else " "
             stdscr.addstr(y, x*4, char*4, curses.color_pair(1))
     stdscr.refresh()
-# this is very cutiee when to find the path u jst hit one of theeese .
+# this is very cutiee when u want to find the path u jst hit one of theeese .
     for y, row in enumerate(maze):
         for x, cell in enumerate(row):
             if cell in ("💀", "🗡"):
@@ -44,11 +43,11 @@ def main(stdscr):
             char = "🎀" if cell else " "
             stdscr.addstr(y, x*4, char*4, curses.color_pair(2))
             stdscr.refresh()
-            time.sleep(0.05)  # pause to visualize
+            # time.sleep(0.05)  # pause to visualize
+            key = stdscr.getch()
+            if key == ord('q'):
+                exit(1)
             
-        key = stdscr.getch()
-        if key == ord('q'):
-            break
 if __name__ == "__main__":
     try:
         curses.wrapper(main)

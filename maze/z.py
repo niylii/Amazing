@@ -86,55 +86,20 @@ class Display:
         self.maze_panel.top()
         self.maze_panel.show()
 
+
     def draw_maze(self) -> None:
-        """
-        █████████████████████
-        █     █ █ █ █ █ █ █ █
-        █████ ███████████████
-        █ █ █ █ █ █ █     █ █
-        █████ █████   ███ ███
-        █ █ █ █ █ █ █       █
-        █████ █████ █████████
-        █ █ █       █ █ █ █ █
-        ███████████ █████████
-        █ █ █ █ █ █     █ █ █
-        ███████████ █████████
-        █ █ █ █     █ █ █ █ █
-        █████████████████████
-        █ █ █ █ █ █ █ █ █ █ █
-        █████████████████████
-        █ █ █ █ █ █ █ █ █ █ █
-        █████████████████████
-        █ █ █ █ █ █ █ █ █ █ █
-        █████████████████████
-        █ █ █ █ █ █ █ █ █ █ █
-        █████████████████████
-        """
-        maze_win = self.maze_win
-        maze : Maze = self.maze
-
-        maze_win.addstr(0,1, "Amazing!")
-        cell_char = "█"
-
-
-        for y in range(maze.height + 1):
-            for x in range(maze.width):
-                maze_win.addstr( 4 + y * 2, (self.maze_width//2 - self.maze.width) + x * 2, cell_char * 3)
-            if y < maze.height:
-                maze_win.addstr(5 + y * 2, (self.maze_width//2 - self.maze.width), "█ " * (maze.width + 1))
-
-
-
-        # self.maze_win.refresh()
-
+        # grid = self.maze.grid
+        self.maze_win.addstr(0,1, "Amazing!")
 
     def exit_programme(self) -> None:
+        import sys
+        print("bye!", file=sys.stderr)
         exit(0)
 
     def menu(self) -> None:
 
         menu_options : Dict= {
-            "quit": self.exit_programme,
+            "quit": self.exit_programme(),
             "generate": None,
             "draw path": None,
         }
@@ -144,6 +109,7 @@ class Display:
         if menu_option is None:
             return
         menu_option()
+
 
 
 def display(stdscr : CWindow, maze : Maze) -> None:
@@ -157,17 +123,17 @@ def display(stdscr : CWindow, maze : Maze) -> None:
         # continue
         displayer.menu()
 
+
         displayer.draw_maze()
         displayer.draw_menu()
         curses.panel.update_panels()
         curses.doupdate()
 
 
-
-
 def main():
-    maze : Maze = generate_fake_maze(26, 10)
+    maze : Maze = generate_fake_maze(25, 25)
     curses.wrapper(display, maze)
+
 
 if __name__ == "__main__":
     main()

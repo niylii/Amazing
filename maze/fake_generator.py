@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-import random
 from typing import List, Tuple
+import random
 
 
 @dataclass
@@ -18,6 +18,9 @@ class Maze:
     grid: List[List[Cell]]
     entry: Tuple[int, int]
     exit: Tuple[int, int]
+    # path: Tuple[Tuple[int, int]]
+    def getCell(self, x : int, y : int) -> Cell:
+        return self.grid[y][x]
 
 
 def generate_fake_maze(width: int, height: int) -> Maze:
