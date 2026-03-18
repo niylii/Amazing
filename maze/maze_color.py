@@ -114,7 +114,8 @@ class Display:
         )
         self.menu_win.keypad(True)
         self.menu_win.nodelay(True)
-        self.menu_items = ["generate", "show path", "quit"]
+        self.menu_items = ["generate", "show_path", "quit"]
+#add a button to change color,
 
     def show_menu(self) -> None:
         if self.menu_panel.hidden():
@@ -290,14 +291,14 @@ class Display:
         for y in range(maze.height * 2 + 1):
             for x in range(maze.width * 2 + 1):
                 if x % 2 == 0 or y % 2 == 0:
-                    maze_win.addstr(start_y + y, start_x + x, cell_char)
+                    maze_win.addstr(start_y + y, start_x + x, cell_char, curses.color_pair(5))
 
         for i in range(min(self.maze_animation_step, len(self.maze_timeline))):
             cell_actions = self.maze_timeline[i]
             for (rel_y, rel_x) in cell_actions:
                 maze_win.addstr(start_y + rel_y, start_x + rel_x, " ")
 
-        maze_win.addstr(entry_y, entry_x, cell_char, curses.color_pair(2))
+        maze_win.addstr(entry_y, entry_x, cell_char, curses.color_pair(4))
         maze_win.addstr(exit_y, exit_x, cell_char, curses.color_pair(3))
 
 
@@ -334,7 +335,8 @@ class Display:
         menu_options : Dict= {
             "quit": self.exit_programme,
             "generate": self.generate,
-            "show path": self.show_path,
+            "show_path": self.show_path
+      #      "change_color": self.change_color
         }
 
         option : str|None = self.handle_menu_input()
@@ -367,20 +369,32 @@ class Display:
             self.stdscr.box()
 
 
-C_BLUE = 250
-C_PINK = 251
-C_RED = 252
+C1 = 250
+C2 = 251
+C3 = 252
+C4 = 253
+C5 = 254
+C6 = 255
+
+lavander = []
+storm = []
+tokyo_night = []
+cutie = []
 
 def display(stdscr : CWindow, maze : Maze) -> None:
     curses.start_color()
-    # curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
-    curses.init_color(C_BLUE, 144, 186, 255)
-    curses.init_color(C_PINK, 255, 191, 220)
-    curses.init_color(C_RED, 0, 255, 247)
+    curses.init_color(C1, 980, 1000, 910)   # FAFFE8
+    curses.init_color(C2, 741, 949, 949)    # BDF2F2
+    curses.init_color(C3, 651, 780, 1000)   # A6C7FF
+    curses.init_color(C4, 478, 431, 769)    # 7A6EC4
+    curses.init_color(C5, 859, 561, 769)    # DB8FC4
+    curses.init_color(C6, 1000, 710, 820)   # FFB5D1
 
-    curses.init_pair(1, curses.COLOR_WHITE, 252)
-    curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
-    curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+    curses.init_pair(1, C4, C1)  # UI (menu / borders)
+    curses.init_pair(2, C6, curses.COLOR_BLACK)  # path
+    curses.init_pair(3, C5, curses.COLOR_BLACK)  # exit
+    curses.init_pair(4, C3, curses.COLOR_BLACK)  # entry
+    curses.init_pair(5, C2, curses.COLOR_BLACK)  # maze walls
     displayer : Display = Display(maze, stdscr)
     displayer.prepare_maze_timeline()
 
