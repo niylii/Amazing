@@ -51,7 +51,8 @@ def read_config_file(file: str) -> Dict:
                                 pass
                         except Exception:
                             print("Problem with OUTPUT_FILE",
-                                  "please check existance and permissions and path!")
+                                  "please check existance and"
+                                  "permissions and path!")
                             return {}
                 except Exception as e:
                     print(f"Invalid value for {key}: {value} ({e})")
