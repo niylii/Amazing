@@ -4,4 +4,3 @@ ENTRY=0,0
 EXIT=19,14
 PERFECT=True
 ALGORITHM=
-mew=pk
