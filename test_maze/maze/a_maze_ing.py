@@ -1,11 +1,10 @@
+from typing import Dict, Any
+from validate_config import validate
+from Errors import InvalidEntryError, InvalidFileError, InvalidArgumentError
+from mazegen import MazeGenerator, MazeWriter
+
 import sys
 import os
-from typing import Dict, Any
-
-from maze.validate_config import validate
-from maze.Errors import InvalidEntryError, InvalidFileError, InvalidArgumentError
-from maze.mazegen import MazeGenerator, MazeWriter
-from ui.DISPLAY import Display  # from the ui/ folder
 
 
 def main() -> None:
@@ -46,10 +45,6 @@ def main() -> None:
 
         maze_writer = MazeWriter(maze, config["OUTPUT_FILE"])
         maze_writer.write()
-
-        # Launch the curses UI
-        import curses
-        curses.wrapper(Display, maze)
 
     except (InvalidEntryError, InvalidFileError, InvalidArgumentError) as e:
         print(f"ERROR: {e}")
