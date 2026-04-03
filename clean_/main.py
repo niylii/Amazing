@@ -1,0 +1,47 @@
+"""
+main.py
+Entry point — parses config, builds maze, launches UI.
+"""
+
+from __future__ import annotations
+
+import curses
+import os
+import sys
+from typing import Any, Dict
+
+from config.LOADER   import load_config
+from maze.generator  import MazeGenerator
+from maze.writer     import MazeWriter
+from display.UI      import run_ui
+
+
+def main() -> None:
+    """
+    Usage: python3 main.py config.txt
+    """
+    try:
+        config: Dict[str, Any] = load_config(sys.argv)
+
+        maze = MazeGenerator(
+            width=config["WIDTH"],
+            height=config["HEIGHT"],
+            seed=config["SEED"],
+            perfect=config["PERFECT"],
+            entry_point=config["ENTRY"],
+            exit_point=config["EXIT"],
+        )
+
+        MazeWriter(maze, config["OUTPUT_FILE"]).write()
+
+        curses.wrapper(run_ui, maze)
+
+    except SystemExit:
+        raise
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
