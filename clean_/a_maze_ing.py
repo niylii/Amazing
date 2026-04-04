@@ -31,7 +31,7 @@ def main() -> None:
             entry_point=config["ENTRY"],
             exit_point=config["EXIT"],
         )
-
+        maze.generate()
         MazeWriter(maze, config["OUTPUT_FILE"]).write()
 
         curses.wrapper(run_ui, maze)

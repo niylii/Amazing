@@ -165,6 +165,7 @@ class UI:
                 cfg["entry"],
                 cfg["exit"],
             )
+            self.maze.generate()
             self.path = self.maze.solve()
             self.animator.reset(
                 self.maze,

@@ -232,6 +232,17 @@ class Display:
                 except curses.error:
                     pass
 
+
+        # force-clear 42 pattern
+        for (cx, cy) in maze._pattern_42:
+            real_x = (cx * 2) + 1
+            real_y = (cy * 2) + 1
+            for dy in range(-1, 2):
+                for dx in range(-1, 2):
+                    try:
+                        mw.addstr(start_y + real_y + dy, start_x + real_x + dx, " ")
+                    except curses.error:
+                        pass
         # --- entry / exit markers ---
         def cell_screen(cx: int, cy: int) -> tuple[int, int]:
             return start_x + cx * 2 + 1, start_y + cy * 2 + 1
