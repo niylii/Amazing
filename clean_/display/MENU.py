@@ -15,6 +15,7 @@ from __future__ import annotations
 import curses
 from enum import Enum, auto
 from typing import Callable
+import sys
 
 
 # ------------------------------------------------------------------
@@ -27,8 +28,8 @@ class Action(Enum):
     SHOW_PATH    = auto()
     OPEN_CONFIG  = auto()
     OPEN_CUSTOM  = auto()
-    EXIT         = auto()
     BACK         = auto()
+    EXIT         = lambda: sys.exit(0)
 
 
 # ------------------------------------------------------------------
@@ -53,9 +54,7 @@ class Menu:
                 "oil effect",
             ],
             "walls color": ["white", "cyan", "blue", "green", "red", "yellow", "magenta"],
-            "path color":  ["cyan", "blue"],
-            "theme":       ["dark", "light"],
-            "perfect ":    ["on", "off"],
+            "perfect":    ["on", "off"],
         }
         self.selectors_indexes: dict[str, int] = {k: 0 for k in self.selectors_data}
 
@@ -63,7 +62,7 @@ class Menu:
         self.config: dict = dict(maze_config)
 
         # ---- menu state ----
-        self.state: str = "main"
+        self.state: str = "MENU"
         self.selected_index: int = 0
 
         # ---- input-popup state ----
@@ -87,17 +86,8 @@ class Menu:
         return self.selectors_indexes["walls color"]
 
     @property
-    def path_color_index(self) -> int:
-        return self.selectors_indexes["path color"]
-
-    @property
-    def theme(self) -> str:
-        return self.selectors_data["theme"][self.selectors_indexes["theme"]]
-
-    @property
     def perfect(self) -> bool:
-        return self.selectors_data["perfect "][self.selectors_indexes["perfect "]] == "on"
-
+        return self.selectors_data["perfect"][self.selectors_indexes["perfect"]] == "on"
     # ------------------------------------------------------------------
     # Menu structure
     # ------------------------------------------------------------------
@@ -110,24 +100,22 @@ class Menu:
             ("show path",     "button"),
             ("maze config",   "button"),
             ("custom option", "button"),
-            ("exit",          "button"),
+            ("exit maze",     "button"),
         ]
 
         self.config_items: list[tuple[str, str]] = [
-            (f"width : {c.get('width', '?')}",                                    "button"),
-            (f"height : {c.get('height', '?')}",                                  "button"),
-            (f"entry : {c.get('entry', '?')}",                                    "button"),
-            (f"exit : {c.get('exit', '?')}",                                      "button"),
-            (f"seed : {c.get('seed') if c.get('seed') else 'random'}",            "button"),
-            ("perfect ",                                                            "selector"),
-            ("back",                                                                "button"),
+            (f"width : {c.get('width', '?')}",   "button"),
+            (f"height : {c.get('height', '?')}", "button"),
+            (f"entry : {c.get('entry', '?')}",   "button"),
+            (f"exit : {c.get('exit', '?')}",     "button"),
+            ("back",                             "button"),
         ]
 
         self.custom_items: list[tuple[str, str]] = [
             ("animation",   "selector"),
             ("walls color", "selector"),
-            ("path color",  "selector"),
-            ("theme",       "selector"),
+            ("perfect",     "selector"), 
+            ("seed",        "button"),
             ("back",        "button"),
         ]
 
@@ -136,19 +124,19 @@ class Menu:
     def _rebuild_config_items(self) -> None:
         c = self.config
         self.config_items = [
-            (f"width : {c.get('width', '?')}",                                    "button"),
-            (f"height : {c.get('height', '?')}",                                  "button"),
-            (f"entry : {c.get('entry', '?')}",                                    "button"),
-            (f"exit : {c.get('exit', '?')}",                                      "button"),
-            (f"seed : {c.get('seed') if c.get('seed') else 'random'}",            "button"),
-            ("perfect ",                                                            "selector"),
-            ("back",                                                                "button"),
+            (f"width : {c.get('width', '?')}",                         "button"),
+            (f"height : {c.get('height', '?')}",                       "button"),
+            (f"entry : {c.get('entry', '?')}",                         "button"),
+            (f"exit : {c.get('exit', '?')}",                           "button"),
+            ("perfect ",                                               "selector"),
+            (f"seed : {c.get('seed') if c.get('seed') else 'random'}", "button"),
+            ("back",                                                   "button"),
         ]
         if self.state == "config":
             self.current_items = self.config_items
 
     def _apply_state(self) -> None:
-        if self.state == "main":
+        if self.state == "MENU":
             self.current_items = self.main_items
         elif self.state == "config":
             self.current_items = self.config_items
@@ -167,35 +155,33 @@ class Menu:
         """
         items = self.current_items
         name, kind = items[self.selected_index]
-
         # ---- vertical navigation ----
-        if key in (curses.KEY_UP, ord('k')):
+        if key == curses.KEY_UP:
             self.selected_index = (self.selected_index - 1) % len(items)
             return Action.NONE
 
-        if key in (curses.KEY_DOWN, ord('j')):
+        if key == curses.KEY_DOWN:
             self.selected_index = (self.selected_index + 1) % len(items)
             return Action.NONE
 
         # ---- selector left/right ----
         if kind == "selector":
-            if key in (curses.KEY_LEFT, ord('h')):
+            if key == curses.KEY_LEFT:
                 self.selectors_indexes[name] = (
                     self.selectors_indexes[name] - 1
                 ) % len(self.selectors_data[name])
-            elif key in (curses.KEY_RIGHT, ord('l')):
+            elif key == curses.KEY_RIGHT:
                 self.selectors_indexes[name] = (
                     self.selectors_indexes[name] + 1
                 ) % len(self.selectors_data[name])
             return Action.NONE
+        
+        if name.strip() == "perfect":
+            self.config["perfect"] = self.perfect
 
         # ---- button enter ----
         if key in (curses.KEY_ENTER, ord('\n'), 10, 13):
             return self._activate(name)
-
-        # ---- escape → back ----
-        if key == 27:
-            return self._go_back()
 
         return Action.NONE
 
@@ -206,7 +192,7 @@ class Menu:
             "show path":     Action.SHOW_PATH,
             "maze config":   Action.OPEN_CONFIG,
             "custom option": Action.OPEN_CUSTOM,
-            "exit":          Action.EXIT,
+            "exit maze":     Action.EXIT,
             "back":          Action.BACK,
         }
 
@@ -242,7 +228,7 @@ class Menu:
         return action
 
     def _go_back(self) -> Action:
-        self.state = "main"
+        self.state = "MENU"
         self.selected_index = 0
         self._apply_state()
         return Action.NONE

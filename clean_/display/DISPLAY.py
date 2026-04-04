@@ -85,12 +85,12 @@ class Display:
         curses.init_color(CYAN,   400, 600, 650)
         curses.init_color(WHITE,  600, 650, 750)
 
-    def apply_theme(self, theme: str) -> None:
-        """Switch between dark / light colour pairs."""
-        bg = -1 if theme == "dark" else WHITE
+    def color_correction(self) -> None:
+        """for good colors show up"""
+        # bg = -1 if theme == "dark" else WHITE
         fg_map = [WHITE, CYAN, BLUE, GREEN, RED, YELLOW, MAGENTA]
         for i, fg in enumerate(fg_map, start=1):
-            curses.init_pair(i, fg, bg)
+            curses.init_pair(i, fg, WHITE)
 
     # ------------------------------------------------------------------
     # Window creation
@@ -129,8 +129,8 @@ class Display:
         self.help_win, self.help_panel = create_win_with_panel(h, w, y, x, "help:", 1)
         center_text_win(
             self.help_win,
-            "space: toggle maze animation\n"
-            "k/↑  j/↓: navigate up/down",
+            "space : toggles maze animation\n"
+            "arrows: navigates up/down - left/right\n",
         )
 
     def create_input_popup(self, label: str) -> None:
@@ -269,7 +269,8 @@ class Display:
         mw = self.maze_win
         start_x = (self.maze_width - (maze.width * 2 + 1)) // 2
         start_y = 2
-        cell_char = "█"
+        #♛
+        cell_char = "▚"
         path_color = (walls_color_idx + 3) % 7 or 1
 
         ex, ey = maze.entry_point

@@ -52,8 +52,8 @@ class UI:
 
     def run(self) -> None:
         while True:
-            theme = self.menu.theme
-            self.display.apply_theme(theme)
+            # theme = self.menu.theme
+            self.display.color_correction()
 
             if not self.display.error_mod:
                 self.display.popup_panel.hide()
@@ -125,10 +125,10 @@ class UI:
             return
 
         # ---- open input popup if menu just set input_mode ----
-        if self.menu.input_mode:
-            label = f"{self.menu.input_source}:"
-            self.display.show_input_popup(label)
-            return
+        # if self.menu.input_mode:
+        #     label = f"{self.menu.input_source}:"
+        #     self.display.show_input_popup(label)
+        #     return
 
         # ---- global shortcuts ----
         if key == ord(' '):
@@ -161,7 +161,7 @@ class UI:
                 cfg["width"],
                 cfg["height"],
                 cfg["seed"],
-                self.menu.perfect,
+                cfg["perfect"],
                 cfg["entry"],
                 cfg["exit"],
             )
