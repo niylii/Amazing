@@ -14,10 +14,7 @@ from typing import Callable
 import sys
 
 
-# ------------------------------------------------------------------
 # Actions the menu can emit
-# ------------------------------------------------------------------
-
 class Action(Enum):
     NONE         = auto()
     GENERATE     = auto()
@@ -28,10 +25,7 @@ class Action(Enum):
     EXIT         = lambda: sys.exit(0)
 
 
-# ------------------------------------------------------------------
 # Menu
-# ------------------------------------------------------------------
-
 class Menu:
     """
     Owns all menu state and key-handling.
@@ -39,7 +33,7 @@ class Menu:
     """
 
     def __init__(self, maze_config: dict) -> None:
-        # ---- selector data & indexes ----
+        # selector data & indexes 
         self.selectors_data: dict[str, list] = {
             "animation":   [
                 "line by line",
@@ -54,25 +48,22 @@ class Menu:
         }
         self.selectors_indexes: dict[str, int] = {k: 0 for k in self.selectors_data}
 
-        # ---- config (mirrors maze parameters) ----
+        # config (mirrors maze parameters) 
         self.config: dict = dict(maze_config)
 
-        # ---- menu state ----
+        #  menu state 
         self.state: str = "MENU"
         self.selected_index: int = 0
 
-        # ---- input-popup state ----
+        #  input-popup state 
         self.input_mode: bool = False
-        self.input_source: str = ""          # which config key we're editing
+        self.input_source: str = ""
         self.pending_action: Action = Action.NONE
 
-        # ---- build menus ----
+        # build menus 
         self._build_menus()
 
-    # ------------------------------------------------------------------
-    # Properties — convenient single-value accessors
-    # ------------------------------------------------------------------
-
+    # Properties : convenient single-value accessors
     @property
     def current_animation(self) -> str:
         return self.selectors_data["animation"][self.selectors_indexes["animation"]]
@@ -84,10 +75,9 @@ class Menu:
     @property
     def perfect(self) -> bool:
         return self.selectors_data["perfect"][self.selectors_indexes["perfect"]] == "on"
-    # ------------------------------------------------------------------
-    # Menu structure
-    # ------------------------------------------------------------------
 
+
+    # Menu structure
     def _build_menus(self) -> None:
         c = self.config
 
@@ -139,21 +129,17 @@ class Menu:
         elif self.state == "custom":
             self.current_items = self.custom_items
 
-    # ------------------------------------------------------------------
     # Key handling  (call from the UI event loop)
-    # ------------------------------------------------------------------
-
     def handle_key(self, key: int) -> Action:
         """
         Process a single keypress.
         Returns an Action the UI controller should act on.
-        Does NOT modify curses state.
         """
         if not self.current_items:
             return Action.NONE
         items = self.current_items
         name, kind = items[self.selected_index]
-        # ---- vertical navigation ----
+        #  vertical navigation 
         if key == curses.KEY_UP:
             self.selected_index = (self.selected_index - 1) % len(items)
             return Action.NONE
@@ -162,7 +148,7 @@ class Menu:
             self.selected_index = (self.selected_index + 1) % len(items)
             return Action.NONE
 
-        # ---- selector left/right ----
+        # selector left/right
         if kind == "selector":
             if key == curses.KEY_LEFT:
                 self.selectors_indexes[name] = (
@@ -173,11 +159,8 @@ class Menu:
                     self.selectors_indexes[name] + 1
                 ) % len(self.selectors_data[name])
             return Action.NONE
-        
-        # if name.strip() == "perfect":
-        #     self.config["perfect"] = self.perfect
 
-        # ---- button enter ----
+        #  button enter 
         if key in (curses.KEY_ENTER, ord('\n'), 10, 13):
             return self._activate(name)
 
@@ -194,7 +177,7 @@ class Menu:
             "back":          Action.BACK,
         }
 
-        # config sub-buttons → request input popup via pending_action
+        # config sub-buttons: request input popup
         config_inputs = {
             "width",
             "height",
@@ -202,7 +185,7 @@ class Menu:
             "exit",
             "seed",
         }
-        # strip trailing label (e.g. "width : 10" → "width")
+        # strip trailing label
         base = name.split(" : ")[0].strip()
         if base in config_inputs:
             self.input_source = base
@@ -214,7 +197,7 @@ class Menu:
             self.state = "config"
             self.selected_index = 0
             self._apply_state()
-            return Action.NONE        # UI re-draws; action handled internally
+            return Action.NONE
         if action == Action.OPEN_CUSTOM:
             self.state = "custom"
             self.selected_index = 0
@@ -231,10 +214,7 @@ class Menu:
         self._apply_state()
         return Action.NONE
 
-    # ------------------------------------------------------------------
     # Input-popup callbacks
-    # ------------------------------------------------------------------
-
     def commit_input(self, raw: str) -> bool:
         """
         Called by UI once the user confirms the input popup.
@@ -277,12 +257,9 @@ class Menu:
     def cancel_input(self) -> None:
         self.input_mode = False
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
+    # Internal helpers
     def _parse_coords(self, s: str, editing: str = "") -> tuple[int, int]:
-    # def _parse_coords(self, s: str) -> tuple[int, int]:
         try:
             parts = s.split(',')
             if len(parts) != 2:
@@ -298,10 +275,8 @@ class Menu:
         except (ValueError, AttributeError):
             return (-1, -1)
 
-    # ------------------------------------------------------------------
-    # Read-only view for the renderer
-    # ------------------------------------------------------------------
 
+    # Read-only view for the renderer
     def render_items(self) -> list[tuple[str, str, bool]]:
         """
         Return [(label, kind, is_selected), ...] for the current menu.

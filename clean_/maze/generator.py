@@ -38,6 +38,7 @@ class MazeGenerator:
         self._pattern_42: Set[Tuple[int, int]] = set()
         self.solution_path: List[Tuple[int, int]] = []
         self._solution_cache: Optional[str] = None
+        self.pattern_42_warning = ""
 
     # Validate that point lies within the grid.
     def _validate_point(self, point: Tuple[int, int],
@@ -55,13 +56,19 @@ class MazeGenerator:
     def display_42(self) -> None:
 
         if self.width < 11 or self.height < 7:
+            need = f"(needs 12x8, "
+            got = f"got {self.width}x{self.height})"
+            self.pattern_42_warning = f"⚠  Maze too small for '42' pattern " + need + got
             return  # grid too small to display the pattern
+        self.pattern_42_warning = ""
 
         mid_x, mid_y = self.width // 2, self.height // 2
 
         coords_4: List[Tuple[int, int]] = [
             (mid_x - 3, mid_y - 2),
+            (mid_x - 1, mid_y - 2),
             (mid_x - 3, mid_y - 1),
+            (mid_x - 1, mid_y - 1),
             (mid_x - 3, mid_y),
             (mid_x - 2, mid_y),
             (mid_x - 1, mid_y),
@@ -87,11 +94,6 @@ class MazeGenerator:
                 continue
             self.grid.get_cell(x, y).visited = True
             self._pattern_42.add((x, y))
-        # for direction, (dx, dy) in [("N", (0,-1)), ("S", (0,1)), ("W", (-1,0)), ("E", (1,0))]:
-        #     nx, ny = x + dx, y + dy
-        #     if self.grid.in_bounds(nx, ny):
-        #         self.grid.open_wall(Cell, self.grid.get_cell(nx, ny), direction)
-
         if self.entry_point in self._pattern_42:
             raise ValueError(
                 f"Entry {self.entry_point} overlaps with the '42' pattern."

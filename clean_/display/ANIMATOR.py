@@ -14,20 +14,16 @@ from collections import deque
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from maze.generator import MazeGenerator   # only for type-checker, not at runtime
+    from maze.generator import MazeGenerator
 
 
 class Animator:
-    """Owns all animation state and algorithms.  Never touches curses."""
-
-    # ------------------------------------------------------------------
-    # Construction
-    # ------------------------------------------------------------------
+    """Owns all animation state and algorithms."""
 
     def __init__(self, maze: "MazeGenerator") -> None:
         self.maze = maze
 
-        # ---- maze animation state ----
+        # maze animation state 
         self.maze_is_animating: bool = False
         self.path_is_animating: bool = False
         self.toggle_animation: bool = True
@@ -39,11 +35,11 @@ class Animator:
 
         self.maze_timeline: list[list[tuple[int, int]]] = []
 
-        # ---- path animation state ----
+        # path animation state 
         self.path_animation_step: int = 0
         self._last_time_path: float = time.time()
 
-        # ---- strategy registry (name → method) ----
+        # strategy registry (name → method) 
         self.strategies: dict[str, Callable[[], list[tuple[int, int]]]] = {
             "line by line": self._strategy_line_by_line,
             "cell by cell": self._strategy_cell_by_cell,
@@ -55,9 +51,6 @@ class Animator:
 
         self.current_strategy: str = "line by line"
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def reset(self, maze: "MazeGenerator", strategy: str, toggle: bool) -> None:
         """Prepare for a brand-new maze (called after generation)."""
@@ -134,10 +127,8 @@ class Animator:
             else:
                 self.path_is_animating = False
 
-    # ------------------------------------------------------------------
-    # Animation strategies  (return ordered coordinate lists)
-    # ------------------------------------------------------------------
 
+    ### animation strategies ###
     def _strategy_random(self) -> list[tuple[int, int]]:
         maze = self.maze
         coords = [(x, y) for y in range(maze.height) for x in range(maze.width)]

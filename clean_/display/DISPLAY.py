@@ -5,7 +5,7 @@ Owns only drawing and window management.
 Responsibilities
 ----------------
 
-If a function calls win.addstr() it lives here.
+fro: win.addstr() callers.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from display.MENU import Menu
 
 
-# ── colour slot constants (match curses.init_color calls in UI) ──────────────
+# colour slot
 BLACK   = 0
 RED     = 1
 GREEN   = 2
@@ -35,10 +35,6 @@ WHITE   = 8
 
 class Display:
     """Pure rendering layer — never owns game state, never calls animate."""
-
-    # ------------------------------------------------------------------
-    # Construction
-    # ------------------------------------------------------------------
 
     def __init__(self, stdscr: "curses._CursesWindow") -> None:
         self.stdscr = stdscr
@@ -62,10 +58,7 @@ class Display:
             self.create_error_popup()
             self.error_mod = True
 
-    # ------------------------------------------------------------------
     # Colour initialisation
-    # ------------------------------------------------------------------
-
     def _init_colors(self) -> None:
         curses.start_color()
         curses.use_default_colors()
@@ -81,15 +74,12 @@ class Display:
 
     def color_correction(self) -> None:
         """for good colors show up"""
-        # bg = -1 if theme == "dark" else WHITE
         fg_map = [WHITE, CYAN, BLUE, GREEN, RED, YELLOW, MAGENTA]
         for i, fg in enumerate(fg_map, start=1):
             curses.init_pair(i, fg, BLACK)
+            curses.init_pair(8, BLUE, BLACK)
 
-    # ------------------------------------------------------------------
     # Window creation
-    # ------------------------------------------------------------------
-
     def create_maze_win(self) -> None:
         self.maze_height = (self.scr_height * 3) // 4 - 1
         self.maze_width  = self.scr_width - 2
@@ -104,7 +94,7 @@ class Display:
 
     def large_maze(self, maze) -> bool:
         needed_cols = maze.width  * 2 + 1
-        needed_rows = maze.height * 2 + 1 + 3   # +3 for status bar + padding
+        needed_rows = maze.height * 2 + 1 + 3 # +3 for status bar + padding
         return needed_cols > self.maze_width or needed_rows > self.maze_height
 
     def create_menu_win(self) -> None:
@@ -172,10 +162,7 @@ class Display:
         except curses.error:
             pass
 
-    # ------------------------------------------------------------------
     # Show / hide panels
-    # ------------------------------------------------------------------
-
     def show_maze(self) -> None:
         if self.maze_panel.hidden():
             self.maze_panel.show()
@@ -212,10 +199,7 @@ class Display:
             self.popup_panel.show()
             self.popup_panel.top()
 
-    # ------------------------------------------------------------------
     # Drawing
-    # ------------------------------------------------------------------
-
     def draw_maze(
         self,
         maze: "MazeGenerator",
@@ -232,7 +216,7 @@ class Display:
         cell_char = "█"
         cell_color = walls_color_idx
 
-        # --- draw solid grid ---
+        # draw solid grid 
         for y in range(maze.height * 2 + 1):
             for x in range(maze.width * 2 + 1):
                 ch = cell_char if (x % 2 == 0 or y % 2 == 0) else ' '
@@ -242,7 +226,7 @@ class Display:
                 except curses.error:
                     pass
 
-        # --- apply animation steps (reveal passages) ---
+        # apply animation steps (reveal passages) 
         for i in range(min(animator.maze_animation_step, len(animator.maze_timeline))):
             for (rel_y, rel_x) in animator.maze_timeline[i]:
                 try:
@@ -255,13 +239,13 @@ class Display:
         for (cx, cy) in maze._pattern_42:
             real_x = (cx * 2) + 1
             real_y = (cy * 2) + 1
-            for dy in range(-1, 2):
-                for dx in range(-1, 2):
-                    try:
-                        mw.addstr(start_y + real_y + dy, start_x + real_x + dx, " ")
-                    except curses.error:
+            try:
+                mw.addstr(start_y + real_y, start_x + real_x, cell_char, curses.color_pair(8)|curses.A_BOLD)
+            except curses.error:
                         pass
-        # --- entry / exit markers ---
+
+
+        # entry / exit markers 
         def cell_screen(cx: int, cy: int) -> tuple[int, int]:
             return start_x + cx * 2 + 1, start_y + cy * 2 + 1
 
@@ -273,7 +257,7 @@ class Display:
         except curses.error:
             pass
 
-        # --- status bar ---
+        # status bar 
         anim_field = f"[animation {toggle_animation}]"
         seed_field  = f"[seed={maze.seed}]"
         try:
@@ -347,10 +331,7 @@ class Display:
             except curses.error:
                 pass
 
-    # ------------------------------------------------------------------
     # Input box passthrough (reading handled by UI layer)
-    # ------------------------------------------------------------------
-
     def gather_input(self) -> str:
         return self.input_box.gather()
 
@@ -358,10 +339,7 @@ class Display:
         self.sub_input_win.leaveok(True)
         self.input_box.do_command(key)
 
-    # ------------------------------------------------------------------
     # Resize
-    # ------------------------------------------------------------------
-
     def check_resized(self) -> bool:
         y, x = self.stdscr.getmaxyx()
         return y != self.scr_height or x != self.scr_width

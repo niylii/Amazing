@@ -18,9 +18,6 @@ from display.UI      import run_ui
 
 
 def main() -> None:
-    """
-    Usage: python3 main.py config.txt
-    """
     signal.signal(signal.SIGQUIT, signal.SIG_IGN)
     try:
         config: Dict[str, Any] = load_config(sys.argv)

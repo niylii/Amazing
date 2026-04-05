@@ -22,7 +22,7 @@ class UI:
         self.maze   = maze
         self.path: str = maze.solve()
 
-        # ---- sub-components ----
+        # sub-components 
         self.display  = Display(stdscr)
         self.animator = Animator(maze)
         self.menu     = Menu({
@@ -36,14 +36,11 @@ class UI:
 
         self.initial_state: bool = True
 
-        # prepare the first timeline so the opening animation plays
         self.animator.current_strategy = self.menu.current_animation
         self.animator.build_maze_timeline()
         self.animator.maze_is_animating = True
 
-    # ------------------------------------------------------------------
     # Main loop
-    # ------------------------------------------------------------------
     def run(self) -> None:
         while True:
             self.display.color_correction()
@@ -66,6 +63,13 @@ class UI:
                 self.display.popup_panel.hide()
                 self.display.show_maze()
                 self.display.show_menu()
+
+                # maze small fit
+                from display.ui_utils import center_text_win
+                if self.maze.pattern_42_warning:
+                    center_text_win(self.display.error_popup_win,
+                                    self.maze.pattern_42_warning)
+                    self.display.show_error_popup()
 
                 # advance animations
                 self.animator.step_maze()
@@ -123,57 +127,9 @@ class UI:
 
             self._process_input()
             curses.napms(30)
-    #     while True:
-    #         # theme = self.menu.theme
-    #         self.display.color_correction()
-    #
-    #         if not self.display.error_mod:
-    #             self.display.popup_panel.hide()
-    #             self.display.show_maze()
-    #             self.display.show_menu()
-    #
-    #             # advance animations
-    #             self.animator.step_maze()
-    #             if not self.animator.maze_is_animating:
-    #                 self.initial_state = False
-    #             self.animator.step_path()
-    #         else:
-    #             self.display.show_error_popup()
-    #
-    #         # draw everything
-    #         try:
-    #             self.display.draw_maze(
-    #                 self.maze,
-    #                 self.animator,
-    #                 self.menu.walls_color_index + 1,   # color_pair 1-based
-    #                 self.animator.toggle_animation,
-    #             )
-    #             self.display.draw_path(
-    #                 self.maze,
-    #                 self.path,
-    #                 self.animator,
-    #                 self.menu.walls_color_index + 1,
-    #                 self.initial_state,
-    #                 self.animator.path_shown,
-    #             )
-    #             self.display.draw_menu(self.menu, self.menu.state)
-    #             self.display.error_mod = True
-    #         except (AttributeError, curses.error):
-    #             self.display.error_mod = True
-    #
-    #         if self.display.check_resized():
-    #             self.display.resize_windows()
-    #
-    #         curses.panel.update_panels()
-    #         curses.doupdate()
-    #
-    #         self._process_input()
-    #         curses.napms(30)
-    #
-    # ------------------------------------------------------------------
-    # Input processing
-    # ------------------------------------------------------------------
 
+
+    # Input processing
     def _process_input(self) -> None:
         # toggle nodelay based on animation state
         animating = self.animator.maze_is_animating or self.animator.path_is_animating
@@ -186,15 +142,14 @@ class UI:
         if key == -1:
             return
 
-        # ---- input-popup mode ----
+        # input-popup mode 
         if self.menu.input_mode:
             if getattr(self, '_skip_next_enter', False):
                 self._skip_next_enter = False
                 if key in (10, 13, curses.KEY_ENTER):
                     return
-            
 
-            if key in (10, 13, curses.KEY_ENTER, 7):   # Enter / Ctrl-G
+            if key in (10, 13, curses.KEY_ENTER, 7):
                 raw = self.display.gather_input()
                 ok = self.menu.commit_input(raw)
                 if not ok:
@@ -202,19 +157,8 @@ class UI:
                         curses.flash()
                     except curses.error:
                         pass
-                    self.menu.cancel_input()       # ← force input_mode = False on bad input
+                    self.menu.cancel_input()
                 self.display.hide_input_popup()
-            # if key in (10, 13, curses.KEY_ENTER, 7):   # Enter / Ctrl-GV
-            #     raw = self.display.gather_input()
-            #     ok = self.menu.commit_input(raw)
-            #     if not ok:
-            #         try:
-            #             curses.flash()
-            #         except curses.error:
-            #             pass
-            #     self.display.hide_input_popup()
-
-
             elif key in (27,):
                 self.menu.cancel_input()
                 self.display.hide_input_popup()
@@ -227,13 +171,7 @@ class UI:
                         pass
             return
 
-        # ---- open input popup if menu just set input_mode ----
-        # if self.menu.input_mode:
-        #     label = f"{self.menu.input_source}:"
-        #     self.display.show_input_popup(label)
-        #     return
-
-        # ---- global shortcuts ----
+        #  global shortcuts 
         if key == ord(' '):
             self.animator.toggle_animation = not self.animator.toggle_animation
             return
@@ -245,7 +183,7 @@ class UI:
         if key == curses.KEY_RESIZE:
             return
 
-        # ---- delegate to menu ----
+        #  delegate to menu 
         action = self.menu.handle_key(key)
 
         # check if menu just entered input mode
@@ -293,10 +231,7 @@ class UI:
             sys.exit(0)
 
 
-# ------------------------------------------------------------------
 # Entry point called by curses.wrapper
-# ------------------------------------------------------------------
-
 def run_ui(stdscr: "curses._CursesWindow", maze) -> None:
     ui = UI(stdscr, maze)
     ui.run()

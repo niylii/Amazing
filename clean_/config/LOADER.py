@@ -1,18 +1,12 @@
 """
 config/loader.py
 Configuration file parsing and validation.
-
-Moved from the old validate() function in main.
 """
 
 from __future__ import annotations
-
 import os
-import sys
 from typing import Any, Dict
 
-
-# ── Custom exceptions (keep them here so imports stay clean) ─────────────────
 
 class InvalidArgumentError(ValueError):
     pass
@@ -24,18 +18,16 @@ class InvalidEntryError(ValueError):
     pass
 
 
-# ── Public API ───────────────────────────────────────────────────────────────
+"""
+Parse sys.argv, validate the config file, and return a config dict.
+Raises:
+------
+InvalidArgumentError  – wrong number of CLI arguments
+InvalidFileError      – file has wrong extension or cannot be read
+InvalidEntryError     – file content is invalid
+"""
 
 def load_config(argv: list[str]) -> Dict[str, Any]:
-    """
-    Parse sys.argv, validate the config file, and return a config dict.
-
-    Raises
-    ------
-    InvalidArgumentError  – wrong number of CLI arguments
-    InvalidFileError      – file has wrong extension or cannot be read
-    InvalidEntryError     – file content is invalid
-    """
     if len(argv) != 2:
         raise InvalidArgumentError("Usage: python3 main.py config.txt")
 
@@ -52,7 +44,7 @@ def load_config(argv: list[str]) -> Dict[str, Any]:
 
 def validate(filename: str) -> Dict[str, Any]:
     """
-    Read *filename* and return a validated config dict with keys:
+    Read "filename" and return a validated config dict with keys:
         WIDTH, HEIGHT, SEED, PERFECT, ENTRY, EXIT, OUTPUT_FILE
     """
     try:
@@ -99,8 +91,6 @@ def validate(filename: str) -> Dict[str, Any]:
 
     return config
 
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _parse_positive_int(key: str, value: str) -> int:
     try:
