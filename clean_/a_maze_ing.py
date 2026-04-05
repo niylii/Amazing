@@ -8,6 +8,7 @@ from __future__ import annotations
 import curses
 import os
 import sys
+import signal
 from typing import Any, Dict
 
 from config.LOADER   import load_config
@@ -20,6 +21,7 @@ def main() -> None:
     """
     Usage: python3 main.py config.txt
     """
+    signal.signal(signal.SIGQUIT, signal.SIG_IGN)
     try:
         config: Dict[str, Any] = load_config(sys.argv)
 
@@ -36,6 +38,9 @@ def main() -> None:
 
         curses.wrapper(run_ui, maze)
 
+    except KeyboardInterrupt:
+        print("AMAZING SAID GOOD BYE")
+        sys.exit(0)
     except SystemExit:
         raise
     except Exception as exc:

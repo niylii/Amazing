@@ -4,11 +4,6 @@ Pure animation logic — no curses dependency, fully testable.
 
 Responsibilities
 ----------------
-Animator
- ├── build_maze_timeline()   build the ordered list of draw-actions
- ├── step_maze()             advance the maze reveal by one tick
- ├── step_path()             advance the path reveal by one tick
- └── animation strategies    return ordered coordinate lists
 """
 
 from __future__ import annotations

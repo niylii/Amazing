@@ -4,10 +4,6 @@ Menu state, selector values, and navigation logic.
 
 Rules
 -----
-- Never calls curses directly
-- Never draws anything
-- Never generates mazes
-- Returns Action values that the UI controller acts on
 """
 
 from __future__ import annotations
@@ -128,7 +124,7 @@ class Menu:
             (f"height : {c.get('height', '?')}",                       "button"),
             (f"entry : {c.get('entry', '?')}",                         "button"),
             (f"exit : {c.get('exit', '?')}",                           "button"),
-            ("perfect ",                                               "selector"),
+            ("perfect",                                               "selector"),
             (f"seed : {c.get('seed') if c.get('seed') else 'random'}", "button"),
             ("back",                                                   "button"),
         ]
@@ -153,6 +149,8 @@ class Menu:
         Returns an Action the UI controller should act on.
         Does NOT modify curses state.
         """
+        if not self.current_items:
+            return Action.NONE
         items = self.current_items
         name, kind = items[self.selected_index]
         # ---- vertical navigation ----
@@ -176,8 +174,8 @@ class Menu:
                 ) % len(self.selectors_data[name])
             return Action.NONE
         
-        if name.strip() == "perfect":
-            self.config["perfect"] = self.perfect
+        # if name.strip() == "perfect":
+        #     self.config["perfect"] = self.perfect
 
         # ---- button enter ----
         if key in (curses.KEY_ENTER, ord('\n'), 10, 13):
@@ -243,15 +241,21 @@ class Menu:
         Returns True if the value was valid, False otherwise.
         """
         raw = raw.strip()
+        if not raw:
+            return False
         key = self.input_source
 
         if key == "seed":
-            if raw == "random":
+            if raw.lower() == "random":
                 self.config["seed"] = None
-            elif raw.lstrip('-').isdecimal():
-                self.config["seed"] = int(raw)
             else:
-                return False
+                try:
+                    val = int(raw)
+                except (ValueError, TypeError):
+                    return False
+                if val <= 0 or val > 500:
+                    return False
+                self.config["seed"] = val
 
         elif key in ("width", "height"):
             if raw.isdecimal() and int(raw) > 0:
@@ -260,7 +264,8 @@ class Menu:
                 return False
 
         elif key in ("entry", "exit"):
-            coord = self._parse_coords(raw)
+            coord = self._parse_coords(raw, editing=key)
+            # coord = self._parse_coords(raw)
             if coord == (-1, -1):
                 return False
             self.config[key] = coord
@@ -276,7 +281,8 @@ class Menu:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _parse_coords(self, s: str) -> tuple[int, int]:
+    def _parse_coords(self, s: str, editing: str = "") -> tuple[int, int]:
+    # def _parse_coords(self, s: str) -> tuple[int, int]:
         try:
             parts = s.split(',')
             if len(parts) != 2:

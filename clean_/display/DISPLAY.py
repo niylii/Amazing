@@ -4,12 +4,6 @@ Owns only drawing and window management.
 
 Responsibilities
 ----------------
-Display
- ├── create_* windows
- ├── draw_maze()
- ├── draw_path()
- ├── draw_menu()
- └── resize_windows()
 
 If a function calls win.addstr() it lives here.
 """
@@ -90,7 +84,7 @@ class Display:
         # bg = -1 if theme == "dark" else WHITE
         fg_map = [WHITE, CYAN, BLUE, GREEN, RED, YELLOW, MAGENTA]
         for i, fg in enumerate(fg_map, start=1):
-            curses.init_pair(i, fg, WHITE)
+            curses.init_pair(i, fg, BLACK)
 
     # ------------------------------------------------------------------
     # Window creation
@@ -107,6 +101,11 @@ class Display:
             "disp", 1,
         )
         self.maze_win.nodelay(True)
+
+    def large_maze(self, maze) -> bool:
+        needed_cols = maze.width  * 2 + 1
+        needed_rows = maze.height * 2 + 1 + 3   # +3 for status bar + padding
+        return needed_cols > self.maze_width or needed_rows > self.maze_height
 
     def create_menu_win(self) -> None:
         self.menu_height = self.scr_height // 4 - 1
@@ -129,8 +128,18 @@ class Display:
         self.help_win, self.help_panel = create_win_with_panel(h, w, y, x, "help:", 1)
         center_text_win(
             self.help_win,
+            "KEYS:\n"
             "space : toggles maze animation\n"
-            "arrows: navigates up/down - left/right\n",
+            "arrows: navigate up/down - left/right - swipe choises\n"
+            "enter: is for entering values (for bottons only)\n"
+            "cntl + C: Amazing says goodbye! lol\n"
+            "CONFIG INSTRUCTIONS:\n"
+            "width/height: integer > 0  (e.g. 20)\n"
+            "entry/exit:* x,y  where x < width, y < height\n"
+            "     * top-left is 0,0  (e.g. 0,0)\n"
+            "           * entry and exit must be different\n"
+            "seed: integer 1-500, or type: random\n"
+            "⚠  press generate after any config change\n"
         )
 
     def create_input_popup(self, label: str) -> None:
@@ -148,13 +157,17 @@ class Display:
         self.input_box = Textbox(self.sub_input_win)
 
     def create_error_popup(self) -> None:
+        error = f"Terminal too small!\nMaze needs {self.maze_width}x{self.maze_height} cells."
+        error_1 = f"\nCurrent terminal: {self.scr_height}x{self.scr_width}\n"
+        error_2 = "Please Ctr+C, resize your terminal then regenrate."
+        resize = error + error_1 + error_2
         try:
             self.error_popup_win, self.popup_panel = create_win_with_panel(
                 self.scr_height, self.scr_width, 0, 0, "pop up!", 5,
             )
             center_text_win(
                 self.error_popup_win,
-                f"resize windows! {self.scr_height}x{self.scr_width}",
+                resize
             )
         except curses.error:
             pass
@@ -181,6 +194,11 @@ class Display:
 
     def hide_input_popup(self) -> None:
         self.input_panel.hide()
+        try:
+            self.sub_input_win.clear()
+            self.sub_input_win.refresh()
+        except curses.error:
+            pass
 
     def toggle_help(self) -> None:
         if self.help_panel.hidden():
@@ -362,7 +380,7 @@ class Display:
             self.create_input_popup("")
             self.create_help_win()
             self.create_error_popup()
-            self.error_mod = False
+            self.error_mod = True
         except curses.error:
             self.create_error_popup()
             self.error_mod = True

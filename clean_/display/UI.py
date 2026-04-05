@@ -1,11 +1,6 @@
 """
 display/ui.py
 Application controller — owns the game loop and coordinates all layers.
-
-    UI
-     ├── run()
-     ├── _handle_action()
-     └── game loop
 """
 
 from __future__ import annotations
@@ -49,11 +44,23 @@ class UI:
     # ------------------------------------------------------------------
     # Main loop
     # ------------------------------------------------------------------
-
     def run(self) -> None:
         while True:
-            # theme = self.menu.theme
             self.display.color_correction()
+
+            if self.display.check_resized():
+                self.display.resize_windows()
+
+            # check if maze fits in the maze window (not full terminal)
+            needed_cols = self.maze.width  * 2 + 1
+            needed_rows = self.maze.height * 2 + 1 + 3
+            maze_fits = (
+                needed_cols <= self.display.maze_width and
+                needed_rows <= self.display.maze_height
+            )
+
+            if not maze_fits:
+                self.display.error_mod = True
 
             if not self.display.error_mod:
                 self.display.popup_panel.hide()
@@ -65,39 +72,104 @@ class UI:
                 if not self.animator.maze_is_animating:
                     self.initial_state = False
                 self.animator.step_path()
+
+                # draw everything
+                try:
+                    self.display.draw_maze(
+                        self.maze,
+                        self.animator,
+                        self.menu.walls_color_index + 1,
+                        self.animator.toggle_animation,
+                    )
+                    self.display.draw_path(
+                        self.maze,
+                        self.path,
+                        self.animator,
+                        self.menu.walls_color_index + 1,
+                        self.initial_state,
+                        self.animator.path_shown,
+                    )
+                    self.display.draw_menu(self.menu, self.menu.state)
+                    self.display.error_mod = False
+                except (AttributeError, curses.error):
+                    self.display.error_mod = True
+
             else:
+                # hide maze and menu panels so they don't bleed through
+                try:
+                    self.display.maze_panel.hide()
+                    self.display.menu_panel.hide()
+                except Exception:
+                    pass
+
+                # redraw error popup with live accurate numbers
+                try:
+                    self.display.error_popup_win.erase()
+                    self.display.error_popup_win.box()
+                    from display.ui_utils import center_text_win
+                    center_text_win(
+                        self.display.error_popup_win,
+                        f"Oh oh ! Terminal too small!\n"
+                        f"Maze needs : {needed_cols} cols x {needed_rows} rows\n"
+                        f"Terminal is: {self.display.maze_width} cols x {self.display.maze_height} rows\n"
+                        f"Please Ctr+C then resize your terminal and regenerate.",
+                    )
+                except curses.error:
+                    pass
                 self.display.show_error_popup()
-
-            # draw everything
-            try:
-                self.display.draw_maze(
-                    self.maze,
-                    self.animator,
-                    self.menu.walls_color_index + 1,   # color_pair 1-based
-                    self.animator.toggle_animation,
-                )
-                self.display.draw_path(
-                    self.maze,
-                    self.path,
-                    self.animator,
-                    self.menu.walls_color_index + 1,
-                    self.initial_state,
-                    self.animator.path_shown,
-                )
-                self.display.draw_menu(self.menu, self.menu.state)
-                self.display.error_mod = False
-            except (AttributeError, curses.error):
-                self.display.error_mod = True
-
-            if self.display.check_resized():
-                self.display.resize_windows()
 
             curses.panel.update_panels()
             curses.doupdate()
 
             self._process_input()
             curses.napms(30)
-
+    #     while True:
+    #         # theme = self.menu.theme
+    #         self.display.color_correction()
+    #
+    #         if not self.display.error_mod:
+    #             self.display.popup_panel.hide()
+    #             self.display.show_maze()
+    #             self.display.show_menu()
+    #
+    #             # advance animations
+    #             self.animator.step_maze()
+    #             if not self.animator.maze_is_animating:
+    #                 self.initial_state = False
+    #             self.animator.step_path()
+    #         else:
+    #             self.display.show_error_popup()
+    #
+    #         # draw everything
+    #         try:
+    #             self.display.draw_maze(
+    #                 self.maze,
+    #                 self.animator,
+    #                 self.menu.walls_color_index + 1,   # color_pair 1-based
+    #                 self.animator.toggle_animation,
+    #             )
+    #             self.display.draw_path(
+    #                 self.maze,
+    #                 self.path,
+    #                 self.animator,
+    #                 self.menu.walls_color_index + 1,
+    #                 self.initial_state,
+    #                 self.animator.path_shown,
+    #             )
+    #             self.display.draw_menu(self.menu, self.menu.state)
+    #             self.display.error_mod = True
+    #         except (AttributeError, curses.error):
+    #             self.display.error_mod = True
+    #
+    #         if self.display.check_resized():
+    #             self.display.resize_windows()
+    #
+    #         curses.panel.update_panels()
+    #         curses.doupdate()
+    #
+    #         self._process_input()
+    #         curses.napms(30)
+    #
     # ------------------------------------------------------------------
     # Input processing
     # ------------------------------------------------------------------
@@ -111,17 +183,48 @@ class UI:
             key = self.display.menu_win.getch()
         except curses.error:
             return
+        if key == -1:
+            return
 
         # ---- input-popup mode ----
         if self.menu.input_mode:
-            if key in (10, 13, 7):   # Enter / Ctrl-G
+            if getattr(self, '_skip_next_enter', False):
+                self._skip_next_enter = False
+                if key in (10, 13, curses.KEY_ENTER):
+                    return
+            
+
+            if key in (10, 13, curses.KEY_ENTER, 7):   # Enter / Ctrl-G
                 raw = self.display.gather_input()
                 ok = self.menu.commit_input(raw)
                 if not ok:
-                    curses.flash()
+                    try:
+                        curses.flash()
+                    except curses.error:
+                        pass
+                    self.menu.cancel_input()       # ← force input_mode = False on bad input
+                self.display.hide_input_popup()
+            # if key in (10, 13, curses.KEY_ENTER, 7):   # Enter / Ctrl-GV
+            #     raw = self.display.gather_input()
+            #     ok = self.menu.commit_input(raw)
+            #     if not ok:
+            #         try:
+            #             curses.flash()
+            #         except curses.error:
+            #             pass
+            #     self.display.hide_input_popup()
+
+
+            elif key in (27,):
+                self.menu.cancel_input()
                 self.display.hide_input_popup()
             else:
-                self.display.feed_key_to_input(key)
+                _SAFE = set(range(32, 127)) | {curses.KEY_BACKSPACE, 127, 8}
+                if key in _SAFE:
+                    try:
+                        self.display.feed_key_to_input(key)
+                    except Exception:
+                        pass
             return
 
         # ---- open input popup if menu just set input_mode ----
@@ -139,11 +242,15 @@ class UI:
             self.display.toggle_help()
             return
 
+        if key == curses.KEY_RESIZE:
+            return
+
         # ---- delegate to menu ----
         action = self.menu.handle_key(key)
 
         # check if menu just entered input mode
         if self.menu.input_mode:
+            self._skip_next_enter = True
             label = f"{self.menu.input_source}:"
             self.display.show_input_popup(label)
             return
@@ -161,7 +268,7 @@ class UI:
                 cfg["width"],
                 cfg["height"],
                 cfg["seed"],
-                cfg["perfect"],
+                self.menu.perfect,
                 cfg["entry"],
                 cfg["exit"],
             )
