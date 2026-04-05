@@ -11,8 +11,10 @@ from typing import Any, Dict
 class InvalidArgumentError(ValueError):
     pass
 
+
 class InvalidFileError(ValueError):
     pass
+
 
 class InvalidEntryError(ValueError):
     pass
@@ -26,6 +28,7 @@ InvalidArgumentError  – wrong number of CLI arguments
 InvalidFileError      – file has wrong extension or cannot be read
 InvalidEntryError     – file content is invalid
 """
+
 
 def load_config(argv: list[str]) -> Dict[str, Any]:
     if len(argv) != 2:
@@ -51,7 +54,8 @@ def validate(filename: str) -> Dict[str, Any]:
         with open(filename) as fh:
             lines = fh.readlines()
     except OSError as exc:
-        raise InvalidFileError(f"Cannot read '{filename}': {exc}") from exc
+        raise InvalidFileError(
+            f"Cannot read '{filename}': {exc}") from exc
 
     config: Dict[str, Any] = {}
 
@@ -61,10 +65,11 @@ def validate(filename: str) -> Dict[str, Any]:
             continue
 
         if "=" not in line:
-            raise InvalidEntryError(f"Malformed line (missing '='): {line!r}")
+            raise InvalidEntryError(
+                f"Malformed line (missing '='): {line!r}")
 
         key, _, value = line.partition("=")
-        key   = key.strip().upper()
+        key = key.strip().upper()
         value = value.strip()
 
         if key == "WIDTH":
@@ -72,7 +77,10 @@ def validate(filename: str) -> Dict[str, Any]:
         elif key == "HEIGHT":
             config["HEIGHT"] = _parse_positive_int(key, value)
         elif key == "SEED":
-            config["SEED"] = None if value.lower() == "random" else _parse_int(key, value)
+            rd = "random"
+            v = value
+            k = key
+            config["SEED"] = None if value.lower() == rd else _parse_int(k, v)
         elif key == "PERFECT":
             config["PERFECT"] = _parse_bool(key, value)
         elif key == "ENTRY":
@@ -84,7 +92,8 @@ def validate(filename: str) -> Dict[str, Any]:
         else:
             raise InvalidEntryError(f"Unknown key: {key!r}")
 
-    _require_keys(config, ["WIDTH", "HEIGHT", "ENTRY", "EXIT", "OUTPUT_FILE"])
+    _require_keys(
+        config, ["WIDTH", "HEIGHT", "ENTRY", "EXIT", "OUTPUT_FILE"])
 
     config.setdefault("SEED",    None)
     config.setdefault("PERFECT", True)
@@ -96,7 +105,8 @@ def _parse_positive_int(key: str, value: str) -> int:
     try:
         n = int(value)
     except ValueError:
-        raise InvalidEntryError(f"{key} must be an integer, got {value!r}")
+        raise InvalidEntryError(
+            f"{key} must be an integer, got {value!r}")
     if n <= 0:
         raise InvalidEntryError(f"{key} must be positive, got {n}")
     return n
@@ -106,7 +116,8 @@ def _parse_int(key: str, value: str) -> int:
     try:
         return int(value)
     except ValueError:
-        raise InvalidEntryError(f"{key} must be an integer, got {value!r}")
+        raise InvalidEntryError(
+            f"{key} must be an integer, got {value!r}")
 
 
 def _parse_bool(key: str, value: str) -> bool:
@@ -115,7 +126,8 @@ def _parse_bool(key: str, value: str) -> bool:
         return True
     if v in ("false", "no", "0", "off"):
         return False
-    raise InvalidEntryError(f"{key} must be a boolean (true/false), got {value!r}")
+    raise InvalidEntryError(
+        f"{key} must be a boolean (true/false), got {value!r}")
 
 
 def _parse_coord(key: str, value: str) -> tuple[int, int]:

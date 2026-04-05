@@ -23,14 +23,14 @@ if TYPE_CHECKING:
 
 
 # colour slot
-BLACK   = 0
-RED     = 1
-GREEN   = 2
-YELLOW  = 3
-BLUE    = 4
+BLACK = 0
+RED = 1
+GREEN = 2
+YELLOW = 3
+BLUE = 4
 MAGENTA = 5
-CYAN    = 6
-WHITE   = 8
+CYAN = 6
+WHITE = 8
 
 
 class Display:
@@ -63,14 +63,14 @@ class Display:
         curses.start_color()
         curses.use_default_colors()
 
-        curses.init_color(BLACK,   50,  55,  75)
-        curses.init_color(RED,    600, 300, 350)
-        curses.init_color(GREEN,  400, 550, 480)
+        curses.init_color(BLACK, 50,  55,  75)
+        curses.init_color(RED, 600, 300, 350)
+        curses.init_color(GREEN, 400, 550, 480)
         curses.init_color(YELLOW, 650, 550, 350)
-        curses.init_color(BLUE,   400, 500, 700)
-        curses.init_color(MAGENTA,600, 450, 650)
-        curses.init_color(CYAN,   400, 600, 650)
-        curses.init_color(WHITE,  600, 650, 750)
+        curses.init_color(BLUE, 400, 500, 700)
+        curses.init_color(MAGENTA, 600, 450, 650)
+        curses.init_color(CYAN, 400, 600, 650)
+        curses.init_color(WHITE, 600, 650, 750)
 
     def color_correction(self) -> None:
         """for good colors show up"""
@@ -82,9 +82,9 @@ class Display:
     # Window creation
     def create_maze_win(self) -> None:
         self.maze_height = (self.scr_height * 3) // 4 - 1
-        self.maze_width  = self.scr_width - 2
-        self.maze_y      = 1
-        self.maze_x      = 1
+        self.maze_width = self.scr_width - 2
+        self.maze_y = 1
+        self.maze_x = 1
         self.maze_win, self.maze_panel = create_win_with_panel(
             self.maze_height, self.maze_width,
             self.maze_y, self.maze_x,
@@ -93,15 +93,15 @@ class Display:
         self.maze_win.nodelay(True)
 
     def large_maze(self, maze) -> bool:
-        needed_cols = maze.width  * 2 + 1
-        needed_rows = maze.height * 2 + 1 + 3 # +3 for status bar + padding
+        needed_cols = maze.width * 2 + 1
+        needed_rows = maze.height * 2 + 1 + 3   # +3 for status bar + padding
         return needed_cols > self.maze_width or needed_rows > self.maze_height
 
     def create_menu_win(self) -> None:
         self.menu_height = self.scr_height // 4 - 1
-        self.menu_width  = 40
-        self.menu_y      = self.scr_height - self.scr_height // 4
-        self.menu_x      = (self.scr_width - self.menu_width) // 2
+        self.menu_width = 40
+        self.menu_y = self.scr_height - self.scr_height // 4
+        self.menu_x = (self.scr_width - self.menu_width) // 2
         self.menu_win, self.menu_panel = create_win_with_panel(
             self.menu_height, self.menu_width,
             self.menu_y, self.menu_x,
@@ -112,10 +112,11 @@ class Display:
 
     def create_help_win(self) -> None:
         h = self.scr_height // 4 - 1
-        w = self.scr_width  // 2 - 1
+        w = self.scr_width // 2 - 1
         y = (self.scr_height - h) // 2
-        x = (self.scr_width  - w) // 2
-        self.help_win, self.help_panel = create_win_with_panel(h, w, y, x, "help:", 1)
+        x = (self.scr_width - w) // 2
+        self.help_win, self.help_panel = create_win_with_panel(
+            h, w, y, x, "help:", 1)
         center_text_win(
             self.help_win,
             "KEYS:\n"
@@ -134,7 +135,7 @@ class Display:
 
     def create_input_popup(self, label: str) -> None:
         self.input_height = 3
-        self.input_width  = 20
+        self.input_width = 20
         self.input_y = self.menu_y + self.menu_height - 2
         self.input_x = self.menu_x + (self.menu_width // 4)
         self.input_win, self.input_panel = create_win_with_panel(
@@ -147,10 +148,11 @@ class Display:
         self.input_box = Textbox(self.sub_input_win)
 
     def create_error_popup(self) -> None:
-        error = f"Terminal too small!\nMaze needs {self.maze_width}x{self.maze_height} cells."
+        error = "Terminal too small!\nMaze needs "
+        need = f"{self.maze_width}x{self.maze_height} cells."
         error_1 = f"\nCurrent terminal: {self.scr_height}x{self.scr_width}\n"
         error_2 = "Please Ctr+C, resize your terminal then regenrate."
-        resize = error + error_1 + error_2
+        resize = error + need + error_1 + error_2
         try:
             self.error_popup_win, self.popup_panel = create_win_with_panel(
                 self.scr_height, self.scr_width, 0, 0, "pop up!", 5,
@@ -211,23 +213,25 @@ class Display:
         mw.erase()
         mw.box()
 
-        start_x = (self.maze_width  - (maze.width  * 2 + 1)) // 2
+        start_x = (self.maze_width - (maze.width * 2 + 1)) // 2
         start_y = 2
         cell_char = "█"
         cell_color = walls_color_idx
 
-        # draw solid grid 
+        # draw solid grid
         for y in range(maze.height * 2 + 1):
             for x in range(maze.width * 2 + 1):
                 ch = cell_char if (x % 2 == 0 or y % 2 == 0) else ' '
                 try:
                     mw.addstr(start_y + y, start_x + x, ch,
-                               curses.color_pair(cell_color) if ch == cell_char else curses.A_NORMAL)
+                               curses.color_pair(cell_color)
+                                    if ch == cell_char else curses.A_NORMAL)
                 except curses.error:
                     pass
 
-        # apply animation steps (reveal passages) 
-        for i in range(min(animator.maze_animation_step, len(animator.maze_timeline))):
+        # apply animation steps (reveal passages)
+        for i in range(
+            min(animator.maze_animation_step, len(animator.maze_timeline))):
             for (rel_y, rel_x) in animator.maze_timeline[i]:
                 try:
                     mw.addstr(start_y + rel_y, start_x + rel_x, " ")
@@ -240,7 +244,9 @@ class Display:
             real_x = (cx * 2) + 1
             real_y = (cy * 2) + 1
             try:
-                mw.addstr(start_y + real_y, start_x + real_x, cell_char, curses.color_pair(8)|curses.A_BOLD)
+                mw.addstr(
+                    start_y + real_y, start_x + real_x,
+                    cell_char, curses.color_pair(8)|curses.A_BOLD)
             except curses.error:
                         pass
 
@@ -252,8 +258,10 @@ class Display:
         ex, ey = cell_screen(*maze.entry_point)
         xx, xy = cell_screen(*maze.exit_point)
         try:
-            mw.addstr(ey, ex, cell_char, curses.color_pair((cell_color + 2) % 7 or 1))
-            mw.addstr(xy, xx, cell_char, curses.color_pair((cell_color + 1) % 7 or 1))
+            mw.addstr(ey, ex, cell_char,
+                      curses.color_pair((cell_color + 2) % 7 or 1))
+            mw.addstr(xy, xx, cell_char,
+                      curses.color_pair((cell_color + 1) % 7 or 1))
         except curses.error:
             pass
 
@@ -262,8 +270,10 @@ class Display:
         seed_field  = f"[seed={maze.seed}]"
         try:
             mw.addstr(self.maze_height - 1, 1, "infos:")
-            mw.addstr(self.maze_height - 1, 8, anim_field, curses.color_pair(3) | curses.A_BOLD)
-            mw.addstr(self.maze_height - 1, 8 + len(anim_field) + 1, seed_field, curses.color_pair(3))
+            mw.addstr(self.maze_height - 1, 8, anim_field,
+                      curses.color_pair(3) | curses.A_BOLD)
+            mw.addstr(self.maze_height - 1, 8 + len(anim_field) + 1,
+                      seed_field, curses.color_pair(3))
         except curses.error:
             pass
 
@@ -291,21 +301,27 @@ class Display:
         cur_y = start_y + ey * 2 + 1
 
         for i, direction in enumerate(path):
-            if i >= animator.path_animation_step and animator.path_is_animating:
+            if (i >= animator.path_animation_step and
+                    animator.path_is_animating):
                 break
             try:
-                mw.addstr(cur_y, cur_x, cell_char, curses.color_pair(path_color))
+                mw.addstr(cur_y, cur_x, cell_char,
+                          curses.color_pair(path_color))
                 if direction == "N":
-                    mw.addstr(cur_y - 1, cur_x, cell_char, curses.color_pair(path_color))
+                    mw.addstr(cur_y - 1, cur_x, cell_char,
+                              curses.color_pair(path_color))
                     cur_y -= 2
                 elif direction == "S":
-                    mw.addstr(cur_y + 1, cur_x, cell_char, curses.color_pair(path_color))
+                    mw.addstr(cur_y + 1, cur_x, cell_char,
+                              curses.color_pair(path_color))
                     cur_y += 2
                 elif direction == "W":
-                    mw.addstr(cur_y, cur_x - 1, cell_char, curses.color_pair(path_color))
+                    mw.addstr(cur_y, cur_x - 1, cell_char,
+                              curses.color_pair(path_color))
                     cur_x -= 2
                 elif direction == "E":
-                    mw.addstr(cur_y, cur_x + 1, cell_char, curses.color_pair(path_color))
+                    mw.addstr(cur_y, cur_x + 1, cell_char,
+                              curses.color_pair(path_color))
                     cur_x += 2
             except curses.error:
                 pass

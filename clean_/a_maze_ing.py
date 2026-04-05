@@ -6,15 +6,14 @@ Entry point — parses config, builds maze, launches UI.
 from __future__ import annotations
 
 import curses
-import os
 import sys
 import signal
 from typing import Any, Dict
 
-from config.LOADER   import load_config
-from maze.generator  import MazeGenerator
-from maze.writer     import MazeWriter
-from display.UI      import run_ui
+from config.LOADER import load_config
+from maze.generator import MazeGenerator
+from maze.writer import MazeWriter
+from display.UI import run_ui
 
 
 def main() -> None:

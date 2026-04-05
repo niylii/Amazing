@@ -23,7 +23,7 @@ class Animator:
     def __init__(self, maze: "MazeGenerator") -> None:
         self.maze = maze
 
-        # maze animation state 
+        # maze animation state
         self.maze_is_animating: bool = False
         self.path_is_animating: bool = False
         self.toggle_animation: bool = True
@@ -35,11 +35,11 @@ class Animator:
 
         self.maze_timeline: list[list[tuple[int, int]]] = []
 
-        # path animation state 
+        # path animation state
         self.path_animation_step: int = 0
         self._last_time_path: float = time.time()
 
-        # strategy registry (name → method) 
+        # strategy registry (name → method)
         self.strategies: dict[str, Callable[[], list[tuple[int, int]]]] = {
             "line by line": self._strategy_line_by_line,
             "cell by cell": self._strategy_cell_by_cell,
@@ -51,8 +51,8 @@ class Animator:
 
         self.current_strategy: str = "line by line"
 
-
-    def reset(self, maze: "MazeGenerator", strategy: str, toggle: bool) -> None:
+    def reset(self, maze: "MazeGenerator",
+              strategy: str, toggle: bool) -> None:
         """Prepare for a brand-new maze (called after generation)."""
         self.maze = maze
         self.current_strategy = strategy
@@ -68,7 +68,8 @@ class Animator:
     def build_maze_timeline(self) -> None:
         """Compute the full ordered list of per-cell draw-actions."""
         maze = self.maze
-        strategy_fn = self.strategies.get(self.current_strategy, self._strategy_line_by_line)
+        strategy_fn = self.strategies.get(
+            self.current_strategy, self._strategy_line_by_line)
         coords = strategy_fn()
 
         timeline: list[list[tuple[int, int]]] = []
@@ -127,24 +128,26 @@ class Animator:
             else:
                 self.path_is_animating = False
 
-
-    ### animation strategies ###
+    # Animation strategies
     def _strategy_random(self) -> list[tuple[int, int]]:
         maze = self.maze
-        coords = [(x, y) for y in range(maze.height) for x in range(maze.width)]
+        coords = [(x, y) for y in range(maze.height)
+                    for x in range(maze.width)]
         self.maze_animation_step_number = 5
         random.shuffle(coords)
         return coords
 
     def _strategy_line_by_line(self) -> list[tuple[int, int]]:
         maze = self.maze
-        coords = [(x, y) for y in range(maze.height) for x in range(maze.width)]
+        coords = [(x, y) for y in range(maze.height)
+                    for x in range(maze.width)]
         self.maze_animation_step_number = maze.width
         return coords
 
     def _strategy_cell_by_cell(self) -> list[tuple[int, int]]:
         maze = self.maze
-        coords = [(x, y) for y in range(maze.height) for x in range(maze.width)]
+        coords = [(x, y) for y in range(maze.height)
+                    for x in range(maze.width)]
         self.maze_animation_step_number = 1
         return coords
 
@@ -164,7 +167,10 @@ class Animator:
             cx, cy = current
             cell = maze.grid.get_cell(cx, cy)
 
-            for direction, (dx, dy) in [("N", (0, -1)), ("S", (0, 1)), ("W", (-1, 0)), ("E", (1, 0))]:
+            for direction, (dx, dy) in [("N", (0, -1)),
+                                        ("S", (0, 1)),
+                                        ("W", (-1, 0)),
+                                        ("E", (1, 0))]:
                 nx, ny = cx + dx, cy + dy
                 if 0 <= nx < maze.width and 0 <= ny < maze.height:
                     if (nx, ny) not in visited and cell.walls[direction]:
@@ -199,7 +205,10 @@ class Animator:
             cx, cy = queue.popleft()
             cell = maze.grid.get_cell(cx, cy)
 
-            for direction, (dx, dy) in [("N", (0, -1)), ("S", (0, 1)), ("W", (-1, 0)), ("E", (1, 0))]:
+            for direction, (dx, dy) in [("N", (0, -1)),
+                                        ("S", (0, 1)),
+                                        ("W", (-1, 0)),
+                                        ("E", (1, 0))]:
                 nx, ny = cx + dx, cy + dy
                 if 0 <= nx < maze.width and 0 <= ny < maze.height:
                     if (nx, ny) not in visited and cell.walls[direction]:
