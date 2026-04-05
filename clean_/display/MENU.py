@@ -238,7 +238,7 @@ class Menu:
                 self.config["seed"] = val
 
         elif key in ("width", "height"):
-            if raw.isdecimal() and int(raw) > 0:
+            if raw.isdecimal() and 0 < int(raw) <= 50:
                 self.config[key] = int(raw)
             else:
                 return False
@@ -274,7 +274,6 @@ class Menu:
             return (x, y)
         except (ValueError, AttributeError):
             return (-1, -1)
-
 
     # Read-only view for the renderer
     def render_items(self) -> list[tuple[str, str, bool]]:

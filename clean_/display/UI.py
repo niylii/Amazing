@@ -58,6 +58,8 @@ class UI:
 
             if not maze_fits:
                 self.display.error_mod = True
+            else:
+                self.display.error_mod = False
 
             if not self.display.error_mod:
                 self.display.popup_panel.hide()

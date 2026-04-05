@@ -374,7 +374,6 @@ class Display:
             self.create_input_popup("")
             self.create_help_win()
             self.create_error_popup()
-            self.error_mod = True
         except curses.error:
             self.create_error_popup()
             self.error_mod = True
