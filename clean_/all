@@ -1,0 +1,1818 @@
+"""
+main.py
+Entry point — parses config, builds maze, launches UI.
+"""
+
+from __future__ import annotations
+
+import curses
+import sys
+import signal
+from typing import Any, Dict
+
+from config.LOADER import load_config
+from maze.generator import MazeGenerator
+from maze.writer import MazeWriter
+from display.UI import run_ui
+
+
+def main() -> None:
+    signal.signal(signal.SIGQUIT, signal.SIG_IGN)
+    try:
+        config: Dict[str, Any] = load_config(sys.argv)
+
+        maze = MazeGenerator(
+            width=config["WIDTH"],
+            height=config["HEIGHT"],
+            seed=config["SEED"],
+            perfect=config["PERFECT"],
+            entry_point=config["ENTRY"],
+            exit_point=config["EXIT"],
+        )
+        maze.generate()
+        MazeWriter(maze, config["OUTPUT_FILE"]).write()
+
+        curses.wrapper(run_ui, maze)
+
+    except KeyboardInterrupt:
+        print("AMAZING SAID GOOD BYE")
+        sys.exit(0)
+    except SystemExit:
+        raise
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+WIDTH=20
+HEIGHT=15
+ENTRY=0,0
+EXIT=1,0
+OUTPUT_FILE=test.txt
+PERFECT=True
+"""config package — configuration loading and validation."""
+"""
+config/loader.py
+Configuration file parsing and validation.
+"""
+
+from __future__ import annotations
+import os
+from typing import Any, Dict
+
+
+class InvalidArgumentError(ValueError):
+    pass
+
+
+class InvalidFileError(ValueError):
+    pass
+
+
+class InvalidEntryError(ValueError):
+    pass
+
+
+"""
+Parse sys.argv, validate the config file, and return a config dict.
+Raises:
+------
+InvalidArgumentError  – wrong number of CLI arguments
+InvalidFileError      – file has wrong extension or cannot be read
+InvalidEntryError     – file content is invalid
+"""
+
+
+def load_config(argv: list[str]) -> Dict[str, Any]:
+    if len(argv) != 2:
+        raise InvalidArgumentError("Usage: python3 main.py config.txt")
+
+    filename: str = argv[1]
+    _, ext = os.path.splitext(filename)
+
+    if ext != ".txt":
+        raise InvalidFileError(
+            "Configuration file must be plain text (e.g. config.txt)."
+        )
+
+    return validate(filename)
+
+
+def validate(filename: str) -> Dict[str, Any]:
+    """
+    Read "filename" and return a validated config dict with keys:
+        WIDTH, HEIGHT, SEED, PERFECT, ENTRY, EXIT, OUTPUT_FILE
+    """
+    try:
+        with open(filename) as fh:
+            lines = fh.readlines()
+    except OSError as exc:
+        raise InvalidFileError(
+            f"Cannot read '{filename}': {exc}") from exc
+
+    config: Dict[str, Any] = {}
+
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if "=" not in line:
+            raise InvalidEntryError(
+                f"Malformed line (missing '='): {line!r}")
+
+        key, _, value = line.partition("=")
+        key = key.strip().upper()
+        value = value.strip()
+
+        if key == "WIDTH":
+            config["WIDTH"] = _parse_positive_int(key, value)
+        elif key == "HEIGHT":
+            config["HEIGHT"] = _parse_positive_int(key, value)
+        elif key == "SEED":
+            rd = "random"
+            v = value
+            k = key
+            config["SEED"] = None if value.lower() == rd else _parse_int(k, v)
+        elif key == "PERFECT":
+            config["PERFECT"] = _parse_bool(key, value)
+        elif key == "ENTRY":
+            config["ENTRY"] = _parse_coord(key, value)
+        elif key == "EXIT":
+            config["EXIT"] = _parse_coord(key, value)
+        elif key == "OUTPUT_FILE":
+            config["OUTPUT_FILE"] = value
+        else:
+            raise InvalidEntryError(f"Unknown key: {key!r}")
+
+    _require_keys(
+        config, ["WIDTH", "HEIGHT", "ENTRY", "EXIT", "OUTPUT_FILE"])
+
+    config.setdefault("SEED",    None)
+    config.setdefault("PERFECT", True)
+
+    return config
+
+
+def _parse_positive_int(key: str, value: str) -> int:
+    try:
+        n = int(value)
+    except ValueError:
+        raise InvalidEntryError(
+            f"{key} must be an integer, got {value!r}")
+    if n <= 0 or n >= 50:
+        raise InvalidEntryError(f"{key} must be positive, got {n}")
+    return n
+
+
+def _parse_int(key: str, value: str) -> int:
+    try:
+        return int(value)
+    except ValueError:
+        raise InvalidEntryError(
+            f"{key} must be an integer, got {value!r}")
+
+
+def _parse_bool(key: str, value: str) -> bool:
+    v = value.lower()
+    if v in ("true", "yes", "1", "on"):
+        return True
+    if v in ("false", "no", "0", "off"):
+        return False
+    raise InvalidEntryError(
+        f"{key} must be a boolean (true/false), got {value!r}")
+
+
+def _parse_coord(key: str, value: str) -> tuple[int, int]:
+    try:
+        parts = value.split(",")
+        if len(parts) != 2:
+            raise ValueError
+        return (int(parts[0].strip()), int(parts[1].strip()))
+    except ValueError:
+        raise InvalidEntryError(
+            f"{key} must be a coordinate like '3,4', got {value!r}"
+        )
+
+
+def _require_keys(config: dict, keys: list[str]) -> None:
+    for k in keys:
+        if k not in config:
+            raise InvalidEntryError(f"Required key missing: {k}")
+"""
+display/animator.py
+Pure animation logic — no curses dependency, fully testable.
+
+Responsibilities
+----------------
+"""
+
+from __future__ import annotations
+
+import random
+import time
+from collections import deque
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    from maze.generator import MazeGenerator
+
+
+class Animator:
+    """Owns all animation state and algorithms."""
+
+    def __init__(self, maze: "MazeGenerator") -> None:
+        self.maze = maze
+
+        # maze animation state
+        self.maze_is_animating: bool = False
+        self.path_is_animating: bool = False
+        self.toggle_animation: bool = True
+        self.path_shown: bool = False
+
+        self.maze_animation_step: int = 0
+        self.maze_animation_step_number: int = 1
+        self._last_time_maze: float = time.time()
+
+        self.maze_timeline: list[list[tuple[int, int]]] = []
+
+        # path animation state
+        self.path_animation_step: int = 0
+        self._last_time_path: float = time.time()
+
+        # strategy registry (name → method)
+        self.strategies: dict[str, Callable[[], list[tuple[int, int]]]] = {
+            "line by line": self._strategy_line_by_line,
+            "cell by cell": self._strategy_cell_by_cell,
+            "random":       self._strategy_random,
+            "prim":         self._strategy_prim,
+            "spread":       self._strategy_spread,
+            "oil effect":   self._strategy_oil_effect,
+        }
+
+        self.current_strategy: str = "line by line"
+
+    def reset(self, maze: "MazeGenerator",
+              strategy: str, toggle: bool) -> None:
+        """Prepare for a brand-new maze (called after generation)."""
+        self.maze = maze
+        self.current_strategy = strategy
+        self.toggle_animation = toggle
+
+        self.maze_animation_step = 0
+        self.path_animation_step = 0
+        self.maze_is_animating = True
+        self.path_shown = False if toggle else self.path_shown
+
+        self.build_maze_timeline()
+
+    def build_maze_timeline(self) -> None:
+        """Compute the full ordered list of per-cell draw-actions."""
+        maze = self.maze
+        strategy_fn = self.strategies.get(
+            self.current_strategy, self._strategy_line_by_line)
+        coords = strategy_fn()
+
+        timeline: list[list[tuple[int, int]]] = []
+        for x, y in coords:
+            cell = maze.grid.get_cell(x, y)
+            real_x = (x * 2) + 1
+            real_y = (y * 2) + 1
+
+            actions: list[tuple[int, int]] = [(real_y, real_x)]
+            if cell.walls["N"]:
+                actions.append((real_y - 1, real_x))
+            if cell.walls["S"]:
+                actions.append((real_y + 1, real_x))
+            if cell.walls["W"]:
+                actions.append((real_y, real_x - 1))
+            if cell.walls["E"]:
+                actions.append((real_y, real_x + 1))
+
+            timeline.append(actions)
+
+        self.maze_timeline = timeline
+
+    def step_maze(self) -> None:
+        """Advance the maze-reveal animation by one frame."""
+        delay: float = 0.06
+
+        if not self.maze_is_animating:
+            return
+
+        if not self.toggle_animation:
+            # skip straight to the end
+            self.maze_animation_step = len(self.maze_timeline)
+            self.maze_is_animating = False
+            return
+
+        now = time.time()
+        if now - self._last_time_maze >= delay:
+            if self.maze_animation_step < len(self.maze_timeline):
+                self.maze_animation_step += self.maze_animation_step_number
+                self._last_time_maze = now
+            else:
+                self.maze_is_animating = False
+
+    def step_path(self) -> None:
+        """Advance the path-reveal animation by one frame."""
+        delay: float = 0.03
+
+        if not self.path_is_animating or self.maze_is_animating:
+            return
+
+        now = time.time()
+        if now - self._last_time_path >= delay:
+            if self.path_animation_step < len(self.maze.solve()):
+                self.path_animation_step += 1
+                self._last_time_path = now
+            else:
+                self.path_is_animating = False
+
+    # Animation strategies
+    def _strategy_random(self) -> list[tuple[int, int]]:
+        maze = self.maze
+        coords = [(x, y) for y in range(maze.height)
+                    for x in range(maze.width)]
+        self.maze_animation_step_number = 5
+        random.shuffle(coords)
+        return coords
+
+    def _strategy_line_by_line(self) -> list[tuple[int, int]]:
+        maze = self.maze
+        coords = [(x, y) for y in range(maze.height)
+                    for x in range(maze.width)]
+        self.maze_animation_step_number = maze.width
+        return coords
+
+    def _strategy_cell_by_cell(self) -> list[tuple[int, int]]:
+        maze = self.maze
+        coords = [(x, y) for y in range(maze.height)
+                    for x in range(maze.width)]
+        self.maze_animation_step_number = 1
+        return coords
+
+    def _strategy_prim(self) -> list[tuple[int, int]]:
+        maze = self.maze
+        self.maze_animation_step_number = 1
+
+        start = maze.entry_point
+        order: list[tuple[int, int]] = []
+        visited: set[tuple[int, int]] = {start}
+        frontier: list[tuple[int, int]] = [start]
+
+        while frontier:
+            current = random.choice(frontier)
+            frontier.remove(current)
+            order.append(current)
+            cx, cy = current
+            cell = maze.grid.get_cell(cx, cy)
+
+            for direction, (dx, dy) in [("N", (0, -1)),
+                                        ("S", (0, 1)),
+                                        ("W", (-1, 0)),
+                                        ("E", (1, 0))]:
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < maze.width and 0 <= ny < maze.height:
+                    if (nx, ny) not in visited and cell.walls[direction]:
+                        visited.add((nx, ny))
+                        frontier.append((nx, ny))
+
+        return order
+
+    def _strategy_oil_effect(self) -> list[tuple[int, int]]:
+        maze = self.maze
+        self.maze_animation_step_number = 5
+        cx, cy = maze.width // 2, maze.height // 2
+
+        coords_with_dist = [
+            (x, y, max(abs(x - cx), abs(y - cy)))
+            for y in range(maze.height)
+            for x in range(maze.width)
+        ]
+        coords_with_dist.sort(key=lambda c: c[2])
+        return [(c[0], c[1]) for c in coords_with_dist]
+
+    def _strategy_spread(self) -> list[tuple[int, int]]:
+        maze = self.maze
+        self.maze_animation_step_number = 2
+        start = (maze.width // 2, maze.height // 2)
+
+        order: list[tuple[int, int]] = [start]
+        queue: deque[tuple[int, int]] = deque([start])
+        visited: set[tuple[int, int]] = {start}
+
+        while queue:
+            cx, cy = queue.popleft()
+            cell = maze.grid.get_cell(cx, cy)
+
+            for direction, (dx, dy) in [("N", (0, -1)),
+                                        ("S", (0, 1)),
+                                        ("W", (-1, 0)),
+                                        ("E", (1, 0))]:
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < maze.width and 0 <= ny < maze.height:
+                    if (nx, ny) not in visited and cell.walls[direction]:
+                        visited.add((nx, ny))
+                        queue.append((nx, ny))
+                        order.append((nx, ny))
+
+        return order
+"""
+display/display.py
+Owns only drawing and window management.
+
+Responsibilities
+----------------
+
+fro: win.addstr() callers.
+"""
+
+from __future__ import annotations
+
+import curses
+import curses.panel
+from typing import TYPE_CHECKING
+
+from display.ui_utils import create_win_with_panel, center_text_win
+
+if TYPE_CHECKING:
+    from maze.generator import MazeGenerator
+    from display.ANIMATOR import Animator
+    from display.MENU import Menu
+
+
+# colour slot
+BLACK = 0
+RED = 1
+GREEN = 2
+YELLOW = 3
+BLUE = 4
+MAGENTA = 5
+CYAN = 6
+WHITE = 8
+
+
+class Display:
+    """Pure rendering layer — never owns game state, never calls animate."""
+
+    def __init__(self, stdscr: "curses._CursesWindow") -> None:
+        self.stdscr = stdscr
+        self.scr_height, self.scr_width = stdscr.getmaxyx()
+
+        curses.curs_set(False)
+        stdscr.nodelay(True)
+        stdscr.box()
+
+        self._init_colors()
+
+        self.error_mod: bool = False
+
+        try:
+            self.create_maze_win()
+            self.create_menu_win()
+            self.create_help_win()
+            self.create_input_popup("")
+            self.create_error_popup()
+        except curses.error:
+            self.create_error_popup()
+            self.error_mod = True
+
+    # Colour initialisation
+    def _init_colors(self) -> None:
+        curses.start_color()
+        curses.use_default_colors()
+
+        curses.init_color(BLACK, 50,  55,  75)
+        curses.init_color(RED, 600, 300, 350)
+        curses.init_color(GREEN, 400, 550, 480)
+        curses.init_color(YELLOW, 650, 550, 350)
+        curses.init_color(BLUE, 400, 500, 700)
+        curses.init_color(MAGENTA, 600, 450, 650)
+        curses.init_color(CYAN, 400, 600, 650)
+        curses.init_color(WHITE, 600, 650, 750)
+
+    def color_correction(self) -> None:
+        """for good colors show up"""
+        fg_map = [WHITE, CYAN, BLUE, GREEN, RED, YELLOW, MAGENTA]
+        for i, fg in enumerate(fg_map, start=1):
+            curses.init_pair(i, fg, BLACK)
+            curses.init_pair(8, BLUE, BLACK)
+
+    # Window creation
+    def create_maze_win(self) -> None:
+        self.maze_height = (self.scr_height * 3) // 4 - 1
+        self.maze_width = self.scr_width - 2
+        self.maze_y = 1
+        self.maze_x = 1
+        self.maze_win, self.maze_panel = create_win_with_panel(
+            self.maze_height, self.maze_width,
+            self.maze_y, self.maze_x,
+            "disp", 1,
+        )
+        self.maze_win.nodelay(True)
+
+    def large_maze(self, maze) -> bool:
+        needed_cols = maze.width * 2 + 1
+        needed_rows = maze.height * 2 + 1 + 3   # +3 for status bar + padding
+        return needed_cols > self.maze_width or needed_rows > self.maze_height
+
+    def create_menu_win(self) -> None:
+        self.menu_height = self.scr_height // 4 - 1
+        self.menu_width = 40
+        self.menu_y = self.scr_height - self.scr_height // 4
+        self.menu_x = (self.scr_width - self.menu_width) // 2
+        self.menu_win, self.menu_panel = create_win_with_panel(
+            self.menu_height, self.menu_width,
+            self.menu_y, self.menu_x,
+            "", 1,
+        )
+        self.menu_win.keypad(True)
+        self.menu_win.nodelay(True)
+
+    def create_help_win(self) -> None:
+        h = self.scr_height // 4 - 1
+        w = self.scr_width // 2 - 1
+        y = (self.scr_height - h) // 2
+        x = (self.scr_width - w) // 2
+        self.help_win, self.help_panel = create_win_with_panel(
+            h, w, y, x, "help:", 1)
+        center_text_win(
+            self.help_win,
+            "KEYS:\n"
+            "space : toggles maze animation\n"
+            "arrows: navigate up/down - left/right - swipe choises\n"
+            "enter: is for entering values (for bottons only)\n"
+            "cntl + C: Amazing says goodbye! lol\n"
+            "CONFIG INSTRUCTIONS:\n"
+            "width/height: integer > 0  (e.g. 20)\n"
+            "entry/exit:* x,y  where x < width, y < height\n"
+            "     * top-left is 0,0  (e.g. 0,0)\n"
+            "           * entry and exit must be different\n"
+            "seed: integer 1-500, or type: random\n"
+            "⚠  press generate after any config change\n"
+        )
+
+    def create_input_popup(self, label: str) -> None:
+        self.input_height = 3
+        self.input_width = 20
+        self.input_y = self.menu_y + self.menu_height - 2
+        self.input_x = self.menu_x + (self.menu_width // 4)
+        self.input_win, self.input_panel = create_win_with_panel(
+            self.input_height, self.input_width,
+            self.input_y, self.input_x,
+            label, 1,
+        )
+        from curses.textpad import Textbox
+        self.sub_input_win = self.input_win.derwin(1, 18, 1, 1)
+        self.input_box = Textbox(self.sub_input_win)
+
+    def create_error_popup(self) -> None:
+        error = "Terminal too small!\nMaze needs "
+        need = f"{self.maze_width}x{self.maze_height} cells."
+        error_1 = f"\nCurrent terminal: {self.scr_height}x{self.scr_width}\n"
+        error_2 = "Please Ctr+C, resize your terminal then regenrate."
+        resize = error + need + error_1 + error_2
+        try:
+            self.error_popup_win, self.popup_panel = create_win_with_panel(
+                self.scr_height, self.scr_width, 0, 0, "pop up!", 5,
+            )
+            center_text_win(
+                self.error_popup_win,
+                resize
+            )
+        except curses.error:
+            pass
+
+    # Show / hide panels
+    def show_maze(self) -> None:
+        if self.maze_panel.hidden():
+            self.maze_panel.show()
+            self.maze_panel.top()
+
+    def show_menu(self) -> None:
+        if self.menu_panel.hidden():
+            self.menu_panel.show()
+            self.menu_panel.top()
+
+    def show_input_popup(self, label: str = "") -> None:
+        self.create_input_popup(label)
+        if self.input_panel.hidden():
+            self.input_panel.show()
+            self.input_panel.top()
+
+    def hide_input_popup(self) -> None:
+        self.input_panel.hide()
+        try:
+            self.sub_input_win.clear()
+            self.sub_input_win.refresh()
+        except curses.error:
+            pass
+
+    def toggle_help(self) -> None:
+        if self.help_panel.hidden():
+            self.help_panel.show()
+            self.help_panel.top()
+        else:
+            self.help_panel.hide()
+
+    def show_error_popup(self) -> None:
+        if self.popup_panel.hidden():
+            self.popup_panel.show()
+            self.popup_panel.top()
+
+    # Drawing
+    def draw_maze(
+        self,
+        maze: "MazeGenerator",
+        animator: "Animator",
+        walls_color_idx: int,
+        toggle_animation: bool,
+    ) -> None:
+        mw = self.maze_win
+        mw.erase()
+        mw.box()
+
+        start_x = (self.maze_width - (maze.width * 2 + 1)) // 2
+        start_y = 2
+        cell_char = "█"
+        cell_color = walls_color_idx
+
+        # draw solid grid
+        for y in range(maze.height * 2 + 1):
+            for x in range(maze.width * 2 + 1):
+                ch = cell_char if (x % 2 == 0 or y % 2 == 0) else ' '
+                try:
+                    mw.addstr(start_y + y, start_x + x, ch,
+                               curses.color_pair(cell_color)
+                                    if ch == cell_char else curses.A_NORMAL)
+                except curses.error:
+                    pass
+
+        # apply animation steps (reveal passages)
+        for i in range(
+            min(animator.maze_animation_step, len(animator.maze_timeline))):
+            for (rel_y, rel_x) in animator.maze_timeline[i]:
+                try:
+                    mw.addstr(start_y + rel_y, start_x + rel_x, " ")
+                except curses.error:
+                    pass
+
+
+        # force-clear 42 pattern
+        for (cx, cy) in maze._pattern_42:
+            real_x = (cx * 2) + 1
+            real_y = (cy * 2) + 1
+            try:
+                mw.addstr(
+                    start_y + real_y, start_x + real_x,
+                    cell_char, curses.color_pair(8)|curses.A_BOLD)
+            except curses.error:
+                        pass
+
+
+        # entry / exit markers 
+        def cell_screen(cx: int, cy: int) -> tuple[int, int]:
+            return start_x + cx * 2 + 1, start_y + cy * 2 + 1
+
+        ex, ey = cell_screen(*maze.entry_point)
+        xx, xy = cell_screen(*maze.exit_point)
+        try:
+            mw.addstr(ey, ex, cell_char,
+                      curses.color_pair((cell_color + 2) % 7 or 1))
+            mw.addstr(xy, xx, cell_char,
+                      curses.color_pair((cell_color + 1) % 7 or 1))
+        except curses.error:
+            pass
+
+        # status bar 
+        anim_field = f"[animation {toggle_animation}]"
+        seed_field  = f"[seed={maze.seed}]"
+        try:
+            mw.addstr(self.maze_height - 1, 1, "infos:")
+            mw.addstr(self.maze_height - 1, 8, anim_field,
+                      curses.color_pair(3) | curses.A_BOLD)
+            mw.addstr(self.maze_height - 1, 8 + len(anim_field) + 1,
+                      seed_field, curses.color_pair(3))
+        except curses.error:
+            pass
+
+    def draw_path(
+        self,
+        maze: "MazeGenerator",
+        path: str,
+        animator: "Animator",
+        walls_color_idx: int,
+        initial_state: bool,
+        path_shown: bool,
+    ) -> None:
+        if not path_shown or initial_state:
+            return
+
+        mw = self.maze_win
+        start_x = (self.maze_width - (maze.width * 2 + 1)) // 2
+        start_y = 2
+        #♛
+        cell_char = "▚"
+        path_color = (walls_color_idx + 3) % 7 or 1
+
+        ex, ey = maze.entry_point
+        cur_x = start_x + ex * 2 + 1
+        cur_y = start_y + ey * 2 + 1
+
+        for i, direction in enumerate(path):
+            if (i >= animator.path_animation_step and
+                    animator.path_is_animating):
+                break
+            try:
+                mw.addstr(cur_y, cur_x, cell_char,
+                          curses.color_pair(path_color))
+                if direction == "N":
+                    mw.addstr(cur_y - 1, cur_x, cell_char,
+                              curses.color_pair(path_color))
+                    cur_y -= 2
+                elif direction == "S":
+                    mw.addstr(cur_y + 1, cur_x, cell_char,
+                              curses.color_pair(path_color))
+                    cur_y += 2
+                elif direction == "W":
+                    mw.addstr(cur_y, cur_x - 1, cell_char,
+                              curses.color_pair(path_color))
+                    cur_x -= 2
+                elif direction == "E":
+                    mw.addstr(cur_y, cur_x + 1, cell_char,
+                              curses.color_pair(path_color))
+                    cur_x += 2
+            except curses.error:
+                pass
+
+    def draw_menu(self, menu: "Menu", menu_state: str) -> None:
+        mw = self.menu_win
+        mw.erase()
+        mw.box()
+
+        try:
+            mw.addstr(0, 2, f"{menu_state}:", curses.A_DIM | curses.A_REVERSE)
+            mw.addstr(self.menu_height - 1, 2, "(?=help)", curses.A_DIM)
+        except curses.error:
+            pass
+
+        for i, (label, _kind, selected) in enumerate(menu.render_items()):
+            prefix = "> " if selected else "  "
+            attr   = curses.A_REVERSE | curses.A_BOLD if selected else curses.A_NORMAL
+            p_attr = curses.A_BLINK | (curses.A_REVERSE if selected else curses.A_NORMAL)
+            try:
+                mw.addstr(i + 2, 2, prefix, p_attr)
+                mw.addstr(i + 2, 4, label,  attr)
+            except curses.error:
+                pass
+
+    # Input box passthrough (reading handled by UI layer)
+    def gather_input(self) -> str:
+        return self.input_box.gather()
+
+    def feed_key_to_input(self, key: int) -> None:
+        self.sub_input_win.leaveok(True)
+        self.input_box.do_command(key)
+
+    # Resize
+    def check_resized(self) -> bool:
+        y, x = self.stdscr.getmaxyx()
+        return y != self.scr_height or x != self.scr_width
+
+    def resize_windows(self) -> None:
+        try:
+            y, x = self.stdscr.getmaxyx()
+            self.scr_height, self.scr_width = y, x
+            curses.resizeterm(y, x)
+            curses.update_lines_cols()
+
+            self.stdscr.clear()
+            self.stdscr.box()
+            self.create_maze_win()
+            self.create_menu_win()
+            self.create_input_popup("")
+            self.create_help_win()
+            self.create_error_popup()
+        except curses.error:
+            self.create_error_popup()
+            self.error_mod = True
+"""display package — rendering, animation, and menu logic."""
+"""
+display/menu.py
+Menu state, selector values, and navigation logic.
+
+Rules
+-----
+"""
+
+from __future__ import annotations
+
+import curses
+from enum import Enum, auto
+from typing import Callable
+import sys
+
+
+# Actions the menu can emit
+class Action(Enum):
+    NONE         = auto()
+    GENERATE     = auto()
+    SHOW_PATH    = auto()
+    OPEN_CONFIG  = auto()
+    OPEN_CUSTOM  = auto()
+    BACK         = auto()
+    EXIT         = lambda: sys.exit(0)
+
+
+# Menu
+class Menu:
+    """
+    Owns all menu state and key-handling.
+    Returns Action values; never touches the screen.
+    """
+
+    def __init__(self, maze_config: dict) -> None:
+        # selector data & indexes 
+        self.selectors_data: dict[str, list] = {
+            "animation":   [
+                "line by line",
+                "cell by cell",
+                "random",
+                "prim",
+                "spread",
+                "oil effect",
+            ],
+            "walls color": ["white", "cyan", "blue", "green", "red", "yellow", "magenta"],
+            "perfect":    ["on", "off"],
+        }
+        self.selectors_indexes: dict[str, int] = {k: 0 for k in self.selectors_data}
+
+        # config (mirrors maze parameters) 
+        self.config: dict = dict(maze_config)
+
+        #  menu state 
+        self.state: str = "MENU"
+        self.selected_index: int = 0
+
+        #  input-popup state 
+        self.input_mode: bool = False
+        self.input_source: str = ""
+        self.pending_action: Action = Action.NONE
+
+        # build menus 
+        self._build_menus()
+
+    # Properties : convenient single-value accessors
+    @property
+    def current_animation(self) -> str:
+        return self.selectors_data["animation"][self.selectors_indexes["animation"]]
+
+    @property
+    def walls_color_index(self) -> int:
+        return self.selectors_indexes["walls color"]
+
+    @property
+    def perfect(self) -> bool:
+        return self.selectors_data["perfect"][self.selectors_indexes["perfect"]] == "on"
+
+
+    # Menu structure
+    def _build_menus(self) -> None:
+        c = self.config
+
+        self.main_items: list[tuple[str, str]] = [
+            ("generate",      "button"),
+            ("show path",     "button"),
+            ("maze config",   "button"),
+            ("custom option", "button"),
+            ("exit maze",     "button"),
+        ]
+
+        self.config_items: list[tuple[str, str]] = [
+            (f"width : {c.get('width', '?')}",   "button"),
+            (f"height : {c.get('height', '?')}", "button"),
+            (f"entry : {c.get('entry', '?')}",   "button"),
+            (f"exit : {c.get('exit', '?')}",     "button"),
+            ("back",                             "button"),
+        ]
+
+        self.custom_items: list[tuple[str, str]] = [
+            ("animation",   "selector"),
+            ("walls color", "selector"),
+            ("perfect",     "selector"), 
+            ("seed",        "button"),
+            ("back",        "button"),
+        ]
+
+        self._apply_state()
+
+    def _rebuild_config_items(self) -> None:
+        c = self.config
+        self.config_items = [
+            (f"width : {c.get('width', '?')}",                         "button"),
+            (f"height : {c.get('height', '?')}",                       "button"),
+            (f"entry : {c.get('entry', '?')}",                         "button"),
+            (f"exit : {c.get('exit', '?')}",                           "button"),
+            ("perfect",                                               "selector"),
+            (f"seed : {c.get('seed') if c.get('seed') else 'random'}", "button"),
+            ("back",                                                   "button"),
+        ]
+        if self.state == "config":
+            self.current_items = self.config_items
+
+    def _apply_state(self) -> None:
+        if self.state == "MENU":
+            self.current_items = self.main_items
+        elif self.state == "config":
+            self.current_items = self.config_items
+        elif self.state == "custom":
+            self.current_items = self.custom_items
+
+    # Key handling  (call from the UI event loop)
+    def handle_key(self, key: int) -> Action:
+        """
+        Process a single keypress.
+        Returns an Action the UI controller should act on.
+        """
+        if not self.current_items:
+            return Action.NONE
+        items = self.current_items
+        name, kind = items[self.selected_index]
+        #  vertical navigation 
+        if key == curses.KEY_UP:
+            self.selected_index = (self.selected_index - 1) % len(items)
+            return Action.NONE
+
+        if key == curses.KEY_DOWN:
+            self.selected_index = (self.selected_index + 1) % len(items)
+            return Action.NONE
+
+        # selector left/right
+        if kind == "selector":
+            if key == curses.KEY_LEFT:
+                self.selectors_indexes[name] = (
+                    self.selectors_indexes[name] - 1
+                ) % len(self.selectors_data[name])
+            elif key == curses.KEY_RIGHT:
+                self.selectors_indexes[name] = (
+                    self.selectors_indexes[name] + 1
+                ) % len(self.selectors_data[name])
+            return Action.NONE
+
+        #  button enter 
+        if key in (curses.KEY_ENTER, ord('\n'), 10, 13):
+            return self._activate(name)
+
+        return Action.NONE
+
+    def _activate(self, name: str) -> Action:
+        """Map a button name to an Action."""
+        _map: dict[str, Action] = {
+            "generate":      Action.GENERATE,
+            "show path":     Action.SHOW_PATH,
+            "maze config":   Action.OPEN_CONFIG,
+            "custom option": Action.OPEN_CUSTOM,
+            "exit maze":     Action.EXIT,
+            "back":          Action.BACK,
+        }
+
+        # config sub-buttons: request input popup
+        config_inputs = {
+            "width",
+            "height",
+            "entry",
+            "exit",
+            "seed",
+        }
+        # strip trailing label
+        base = name.split(" : ")[0].strip()
+        if base in config_inputs:
+            self.input_source = base
+            self.input_mode = True
+            return Action.NONE
+
+        action = _map.get(name, Action.NONE)
+        if action == Action.OPEN_CONFIG:
+            self.state = "config"
+            self.selected_index = 0
+            self._apply_state()
+            return Action.NONE
+        if action == Action.OPEN_CUSTOM:
+            self.state = "custom"
+            self.selected_index = 0
+            self._apply_state()
+            return Action.NONE
+        if action == Action.BACK:
+            return self._go_back()
+
+        return action
+
+    def _go_back(self) -> Action:
+        self.state = "MENU"
+        self.selected_index = 0
+        self._apply_state()
+        return Action.NONE
+
+    # Input-popup callbacks
+    def commit_input(self, raw: str) -> bool:
+        """
+        Called by UI once the user confirms the input popup.
+        Returns True if the value was valid, False otherwise.
+        """
+        raw = raw.strip()
+        if not raw:
+            return False
+        key = self.input_source
+
+        if key == "seed":
+            if raw.lower() == "random":
+                self.config["seed"] = None
+            else:
+                try:
+                    val = int(raw)
+                except (ValueError, TypeError):
+                    return False
+                if val <= 0 or val > 500:
+                    return False
+                self.config["seed"] = val
+
+        elif key in ("width", "height"):
+            if raw.isdecimal() and 0 < int(raw) <= 50:
+                self.config[key] = int(raw)
+            else:
+                return False
+
+        elif key in ("entry", "exit"):
+            coord = self._parse_coords(raw, editing=key)
+            # coord = self._parse_coords(raw)
+            if coord == (-1, -1):
+                return False
+            self.config[key] = coord
+
+        self.input_mode = False
+        self._rebuild_config_items()
+        return True
+
+    def cancel_input(self) -> None:
+        self.input_mode = False
+
+
+    # Internal helpers
+    def _parse_coords(self, s: str, editing: str = "") -> tuple[int, int]:
+        try:
+            parts = s.split(',')
+            if len(parts) != 2:
+                return (-1, -1)
+            x, y = int(parts[0].strip()), int(parts[1].strip())
+            if (x, y) in (self.config.get("entry"), self.config.get("exit")):
+                return (-1, -1)
+            if x >= self.config.get("width", 0) or y >= self.config.get("height", 0):
+                return (-1, -1)
+            if x < 0 or y < 0:
+                return (-1, -1)
+            return (x, y)
+        except (ValueError, AttributeError):
+            return (-1, -1)
+
+    # Read-only view for the renderer
+    def render_items(self) -> list[tuple[str, str, bool]]:
+        """
+        Return [(label, kind, is_selected), ...] for the current menu.
+        Selectors have their current value embedded in the label.
+        """
+        result = []
+        for i, (name, kind) in enumerate(self.current_items):
+            if kind == "selector":
+                val = self.selectors_data[name][self.selectors_indexes[name]]
+                label = f"{name}: < {val} >"
+            else:
+                label = name
+            result.append((label, kind, i == self.selected_index))
+        return result
+"""
+display/ui.py
+Application controller — owns the game loop and coordinates all layers.
+"""
+
+from __future__ import annotations
+
+import curses
+import curses.panel
+import sys
+
+from display.DISPLAY  import Display
+from display.ANIMATOR import Animator
+from display.MENU     import Action, Menu
+
+
+class UI:
+    """Coordinates Display, Animator, Menu, and Maze.  No direct drawing."""
+
+    def __init__(self, stdscr: "curses._CursesWindow", maze) -> None:
+        self.stdscr = stdscr
+        self.maze   = maze
+        self.path: str = maze.solve()
+
+        # sub-components 
+        self.display  = Display(stdscr)
+        self.animator = Animator(maze)
+        self.menu     = Menu({
+            "width":  maze.width,
+            "height": maze.height,
+            "entry":  maze.entry_point,
+            "exit":   maze.exit_point,
+            "seed":   maze.seed,
+            "perfect": maze.perfect,
+        })
+
+        self.initial_state: bool = True
+
+        self.animator.current_strategy = self.menu.current_animation
+        self.animator.build_maze_timeline()
+        self.animator.maze_is_animating = True
+
+    # Main loop
+    def run(self) -> None:
+        while True:
+            self.display.color_correction()
+
+            if self.display.check_resized():
+                self.display.resize_windows()
+
+            # check if maze fits in the maze window (not full terminal)
+            needed_cols = self.maze.width  * 2 + 1
+            needed_rows = self.maze.height * 2 + 1 + 3
+            maze_fits = (
+                needed_cols <= self.display.maze_width and
+                needed_rows <= self.display.maze_height
+            )
+
+            if not maze_fits:
+                self.display.error_mod = True
+            else:
+                self.display.error_mod = False
+
+            if not self.display.error_mod:
+                self.display.popup_panel.hide()
+                self.display.show_maze()
+                self.display.show_menu()
+
+                # maze small fit
+                from display.ui_utils import center_text_win
+                if self.maze.pattern_42_warning:
+                    center_text_win(self.display.error_popup_win,
+                                    self.maze.pattern_42_warning)
+                    self.display.show_error_popup()
+
+                # advance animations
+                self.animator.step_maze()
+                if not self.animator.maze_is_animating:
+                    self.initial_state = False
+                self.animator.step_path()
+
+                # draw everything
+                try:
+                    self.display.draw_maze(
+                        self.maze,
+                        self.animator,
+                        self.menu.walls_color_index + 1,
+                        self.animator.toggle_animation,
+                    )
+                    self.display.draw_path(
+                        self.maze,
+                        self.path,
+                        self.animator,
+                        self.menu.walls_color_index + 1,
+                        self.initial_state,
+                        self.animator.path_shown,
+                    )
+                    self.display.draw_menu(self.menu, self.menu.state)
+                    self.display.error_mod = False
+                except (AttributeError, curses.error):
+                    self.display.error_mod = True
+
+            else:
+                # hide maze and menu panels so they don't bleed through
+                try:
+                    self.display.maze_panel.hide()
+                    self.display.menu_panel.hide()
+                except Exception:
+                    pass
+
+                # redraw error popup with live accurate numbers
+                try:
+                    self.display.error_popup_win.erase()
+                    self.display.error_popup_win.box()
+                    from display.ui_utils import center_text_win
+                    center_text_win(
+                        self.display.error_popup_win,
+                        f"Oh oh ! Terminal too small!\n"
+                        f"Maze needs : {needed_cols} cols x {needed_rows} rows\n"
+                        f"Terminal is: {self.display.maze_width} cols x {self.display.maze_height} rows\n"
+                        f"Please Ctr+C then resize your terminal and regenerate.",
+                    )
+                except curses.error:
+                    pass
+                self.display.show_error_popup()
+
+            curses.panel.update_panels()
+            curses.doupdate()
+
+            self._process_input()
+            curses.napms(30)
+
+
+    # Input processing
+    def _process_input(self) -> None:
+        # toggle nodelay based on animation state
+        animating = self.animator.maze_is_animating or self.animator.path_is_animating
+        self.display.menu_win.nodelay(animating)
+
+        try:
+            key = self.display.menu_win.getch()
+        except curses.error:
+            return
+        if key == -1:
+            return
+
+        # input-popup mode 
+        if self.menu.input_mode:
+            if getattr(self, '_skip_next_enter', False):
+                self._skip_next_enter = False
+                if key in (10, 13, curses.KEY_ENTER):
+                    return
+
+            if key in (10, 13, curses.KEY_ENTER, 7):
+                raw = self.display.gather_input()
+                ok = self.menu.commit_input(raw)
+                if not ok:
+                    try:
+                        curses.flash()
+                    except curses.error:
+                        pass
+                    self.menu.cancel_input()
+                self.display.hide_input_popup()
+            elif key in (27,):
+                self.menu.cancel_input()
+                self.display.hide_input_popup()
+            else:
+                _SAFE = set(range(32, 127)) | {curses.KEY_BACKSPACE, 127, 8}
+                if key in _SAFE:
+                    try:
+                        self.display.feed_key_to_input(key)
+                    except Exception:
+                        pass
+            return
+
+        #  global shortcuts 
+        if key == ord(' '):
+            self.animator.toggle_animation = not self.animator.toggle_animation
+            return
+
+        if key == ord('?'):
+            self.display.toggle_help()
+            return
+
+        if key == curses.KEY_RESIZE:
+            return
+
+        #  delegate to menu 
+        action = self.menu.handle_key(key)
+
+        # check if menu just entered input mode
+        if self.menu.input_mode:
+            self._skip_next_enter = True
+            label = f"{self.menu.input_source}:"
+            self.display.show_input_popup(label)
+            return
+
+        self._handle_action(action)
+
+    def _handle_action(self, action: Action) -> None:
+        if action == Action.NONE:
+            return
+
+        elif action == Action.GENERATE:
+            from maze.generator import MazeGenerator
+            cfg = self.menu.config
+            self.maze = MazeGenerator(
+                cfg["width"],
+                cfg["height"],
+                cfg["seed"],
+                self.menu.perfect,
+                cfg["entry"],
+                cfg["exit"],
+            )
+            self.maze.generate()
+            self.path = self.maze.solve()
+            self.animator.reset(
+                self.maze,
+                self.menu.current_animation,
+                self.animator.toggle_animation,
+            )
+            self.initial_state = True
+
+        elif action == Action.SHOW_PATH:
+            if self.animator.maze_is_animating:
+                return
+            self.path = self.maze.solve()
+            self.animator.path_shown = not self.animator.path_shown
+            self.animator.path_is_animating = True
+            self.animator.path_animation_step = 0
+
+        elif action == Action.EXIT:
+            sys.exit(0)
+
+
+# Entry point called by curses.wrapper
+def run_ui(stdscr: "curses._CursesWindow", maze) -> None:
+    ui = UI(stdscr, maze)
+    ui.run()
+"""
+display/ui_utils.py
+Stateless curses utility helpers — no class, no state.
+"""
+
+import curses
+import curses.panel
+
+
+def create_win_with_panel(
+    height: int,
+    width: int,
+    y: int,
+    x: int,
+    title: str,
+    color_pair: int,
+) -> tuple:
+    """Create a bordered curses window + panel and return both."""
+    win = curses.newwin(height, width, y, x)
+    win.box()
+    if title:
+        win.addstr(0, 2, title, curses.color_pair(color_pair))
+    panel = curses.panel.new_panel(win)
+    panel.hide()
+    curses.panel.update_panels()
+    return win, panel
+
+
+def center_text_win(win, text: str) -> None:
+    """Write *text* centred inside *win* (single line, vertically centred)."""
+    height, width = win.getmaxyx()
+    lines = text.splitlines()
+    start_y = max(1, (height - len(lines)) // 2)
+    for i, line in enumerate(lines):
+        x = max(1, (width - len(line)) // 2)
+        try:
+            win.addstr(start_y + i, x, line)
+        except curses.error:
+            pass
+
+
+def center_text(stdscr, text: str) -> None:
+    """Write *text* centred on *stdscr*."""
+    center_text_win(stdscr, text)
+from typing import Dict, List
+
+
+# Represents one square in the maze grid
+class Cell:
+    def __init__(self, x: int, y: int) -> None:
+
+        self.x: int = x
+        self.y: int = y
+        self.walls: Dict[str, bool] = {
+            "N": False,
+            "E": False,
+            "S": False,
+            "W": False,
+        }
+        self.visited: bool = False
+
+    def to_hex(self) -> str:
+
+        HEX: str = "0123456789ABCDEF"
+        BIT_INDEX: Dict[str, int] = {"N": 0, "E": 1, "S": 2, "W": 3}
+        bits: List[str] = ["1", "1", "1", "1"]
+
+        for direction, index in BIT_INDEX.items():
+            if self.walls[direction]:  # open wall -> bit 0
+                bits[index] = "0"
+
+        return HEX[int("".join(reversed(bits)), 2)]
+from __future__ import annotations
+
+import random
+from collections import deque
+from typing import List, Optional, Set, Tuple
+
+from maze.cell import Cell
+from maze.grid import Grid
+
+
+class MazeGenerator:
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        seed: Optional[int],
+        perfect: bool,
+        entry_point: Tuple[int, int],
+        exit_point: Tuple[int, int],
+    ) -> None:
+
+        self.width: int = width
+        self.height: int = height
+        self.seed: Optional[int] = seed
+        self.perfect: bool = perfect
+        self.entry_point: Tuple[int, int] = self._validate_point(
+            entry_point, "entry")
+        self.exit_point: Tuple[int, int] = self._validate_point(
+            exit_point, "exit")
+
+        if self.entry_point == self.exit_point:
+            raise ValueError("entry and exit must be different cells.")
+
+        if seed is not None:
+            random.seed(seed)
+
+        self.grid: Grid = Grid(width, height)
+        self._pattern_42: Set[Tuple[int, int]] = set()
+        self.solution_path: List[Tuple[int, int]] = []
+        self._solution_cache: Optional[str] = None
+        self.pattern_42_warning = ""
+
+    # Validate that point lies within the grid.
+    def _validate_point(self, point: Tuple[int, int],
+                        name: str) -> Tuple[int, int]:
+
+        x, y = point
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            raise ValueError(
+                f"{name} ({x}, {y}) is out of bounds "
+                f"for a {self.width}x{self.height} grid."
+            )
+        return point
+
+    # the 42 display , mark as visited
+    def display_42(self) -> None:
+
+        if self.width < 11 or self.height < 7:
+            need = f"(needs 12x8, "
+            got = f"got {self.width}x{self.height})"
+            self.pattern_42_warning = f"⚠  Maze too small for '42' pattern " + need + got
+            return  # grid too small to display the pattern
+        self.pattern_42_warning = ""
+
+        mid_x, mid_y = self.width // 2, self.height // 2
+
+        coords_4: List[Tuple[int, int]] = [
+            (mid_x - 3, mid_y - 2),
+            (mid_x - 1, mid_y - 2),
+            (mid_x - 3, mid_y - 1),
+            (mid_x - 1, mid_y - 1),
+            (mid_x - 3, mid_y),
+            (mid_x - 2, mid_y),
+            (mid_x - 1, mid_y),
+            (mid_x - 1, mid_y + 1),
+            (mid_x - 1, mid_y + 2),
+        ]
+        coords_2: List[Tuple[int, int]] = [
+            (mid_x + 1, mid_y - 2),
+            (mid_x + 2, mid_y - 2),
+            (mid_x + 3, mid_y - 2),
+            (mid_x + 3, mid_y - 1),
+            (mid_x + 1, mid_y),
+            (mid_x + 2, mid_y),
+            (mid_x + 3, mid_y),
+            (mid_x + 1, mid_y + 1),
+            (mid_x + 1, mid_y + 2),
+            (mid_x + 2, mid_y + 2),
+            (mid_x + 3, mid_y + 2),
+        ]
+
+        for x, y in coords_4 + coords_2:
+            if not self.grid.in_bounds(x, y):
+                continue
+            self.grid.get_cell(x, y).visited = True
+            self._pattern_42.add((x, y))
+        if self.entry_point in self._pattern_42:
+            raise ValueError(
+                f"Entry {self.entry_point} overlaps with the '42' pattern."
+            )
+        if self.exit_point in self._pattern_42:
+            raise ValueError(f"Exit {self.exit_point} "
+                             f"overlaps with the '42' pattern.")
+
+    # DFS helpers
+    def get_unvisited_neighbors(self, cell: Cell) -> List[Tuple[str, Cell]]:
+
+        return [
+            (direction, neighbor)
+            for direction, neighbor in self.grid.get_neighbors(cell)
+            if not neighbor.visited
+        ]
+
+    def _is_3x3_open(self, ax: int, ay: int) -> bool:
+
+        for y in range(ay, ay + 3):
+            for x in range(ax, ax + 2):
+                if not self.grid.get_cell(x, y).walls["E"]:
+                    return False
+        for x in range(ax, ax + 3):
+            for y in range(ay, ay + 2):
+                if not self.grid.get_cell(x, y).walls["S"]:
+                    return False
+        return True
+
+    def can_create_3x3(self, cell: Cell, neighbor: Cell,
+                       direction: str) -> bool:
+
+        self.grid.open_wall(cell, neighbor, direction)
+
+        cx, cy = cell.x, cell.y
+        nx, ny = neighbor.x, neighbor.y
+
+        check_xs = set(range(max(0, cx - 2), min(self.width - 2, cx + 1)))
+        check_xs.update(range(max(0, nx - 2), min(self.width - 2, nx + 1)))
+        check_ys = set(range(max(0, cy - 2), min(self.height - 2, cy + 1)))
+        check_ys.update(range(max(0, ny - 2), min(self.height - 2, ny + 1)))
+
+        result = any(
+            self._is_3x3_open(ax, ay) for ax in check_xs for ay in check_ys)
+
+        self.grid.close_wall(cell, neighbor, direction)
+        return result
+
+    def generate_perfect(self) -> None:
+
+        self.display_42()
+
+        start_cell = self.grid.get_cell(*self.entry_point)
+        start_cell.visited = True
+        stack: List[Cell] = [start_cell]
+
+        while stack:
+            unvisited = self.get_unvisited_neighbors(stack[-1])
+            if unvisited:
+                direction, neighbor = random.choice(unvisited)
+                self.grid.open_wall(stack[-1], neighbor, direction)
+                neighbor.visited = True
+                stack.append(neighbor)
+            else:
+                stack.pop()
+
+    def generate_imperfect(self) -> None:
+
+        self.generate_perfect()
+
+        breakable: List[Tuple[Cell, Cell, str]] = []
+
+        for y in range(self.height):
+            for x in range(self.width):
+                if (x, y) in self._pattern_42:
+                    continue
+                for direction, (dx, dy) in [("E", (1, 0)), ("S", (0, 1))]:
+                    nx, ny = x + dx, y + dy
+                    if not self.grid.in_bounds(nx, ny):
+                        continue
+                    if (nx, ny) in self._pattern_42:
+                        continue
+                    cell = self.grid.get_cell(x, y)
+                    if not cell.walls[direction]:
+                        breakable.append(
+                            (cell, self.grid.get_cell(nx, ny), direction))
+
+        walls_to_open = max(1, len(breakable) // 10)
+        random.shuffle(breakable)
+
+        opened = 0
+        for cell, neighbor, direction in breakable:
+            if opened >= walls_to_open:
+                break
+            if not self.can_create_3x3(cell, neighbor, direction):
+                self.grid.open_wall(cell, neighbor, direction)
+                opened += 1
+
+    def generate(self) -> None:
+        if self.perfect:
+            self.generate_perfect()
+        else:
+            self.generate_imperfect()
+
+    # BFS solver
+    def solve(self) -> str:
+
+        if self._solution_cache is not None:
+            return self._solution_cache
+
+        entry_cell = self.grid.get_cell(*self.entry_point)
+        exit_cell = self.grid.get_cell(*self.exit_point)
+
+        queue: deque[Tuple[Cell, List[str], List[Cell]]] = deque()
+        queue.append((entry_cell, [], [entry_cell]))
+        visited: Set[Cell] = {entry_cell}
+
+        while queue:
+            current, dirs, cell_path = queue.popleft()
+
+            if current is exit_cell:
+                self.solution_path = [(c.x, c.y) for c in cell_path]
+                self._solution_cache = "".join(dirs)
+                return self._solution_cache
+
+            for direction, neighbor in self.grid.get_neighbors(current):
+                if current.walls[direction] and neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append(
+                        (
+                            neighbor,
+                            dirs + [direction],
+                            cell_path + [neighbor],
+                        )
+                    )
+
+        self.solution_path = []
+        self._solution_cache = ""
+        return self._solution_cache
+
+
+# #just for testing and understanding
+#     def afficher_ascii(
+#             self,
+#             show_path: Optional[List[Tuple[int, int]]] = None,
+#         ) -> None:
+# path_set: Set[Tuple[int, int]] = set(show_path) if
+# show_path else set()
+
+#             for y in range(self.height):
+#                 top = ""
+#                 for x in range(self.width):
+#                     cell = self.grid.get_cell(x, y)
+#                     top += "+---" if not cell.walls["N"] else "+   "
+#                 print(top + "+")
+
+#                 middle = ""
+#                 for x in range(self.width):
+#                     cell = self.grid.get_cell(x, y)
+#                     west = "|" if not cell.walls["W"] else " "
+
+#                     if   (x, y) == self.entry_point:  content = " E "
+#                     elif (x, y) == self.exit_point:   content = " X "
+#                     elif (x, y) in self._pattern_42:  content = "###"
+#                     elif (x, y) in path_set:          content = " . "
+#                     else:                             content = "   "
+
+#                     middle += west + content
+#                 print(middle + "|")
+
+#             print("+---" * self.width + "+")
+
+
+# if __name__ == "__main__":
+
+#     width, height = 25, 15
+#     seed = 42
+#     perfect = True,
+#     entry = (0, 0)
+#     exit_ = (width - 1, height - 1)
+
+#     mg = MazeGenerator(
+#         width=width,
+#         height=height,
+#         seed=seed,
+#         perfect=perfect,
+#         entry_point=entry,
+#         exit_point=exit_,
+#     )
+#     mg.generate()
+
+#     mg.solve()
+#     mg.afficher_ascii(show_path=mg.solution_path)
+from typing import Dict, List, Tuple
+
+from maze.cell import Cell
+
+
+OPPOSITE: Dict[str, str] = {
+    "N": "S",
+    "E": "W",
+    "S": "N",
+    "W": "E",
+}
+
+
+class Grid:
+    def __init__(self, width: int, height: int) -> None:
+
+        self.width: int = width
+        self.height: int = height
+        self.cells: List[List[Cell]] = [
+            [Cell(x, y) for x in range(width)] for y in range(height)
+        ]
+
+    def get_cell(self, x: int, y: int) -> Cell:
+        return self.cells[y][x]
+
+    def in_bounds(self, x: int, y: int) -> bool:
+
+        return 0 <= x < self.width and 0 <= y < self.height
+
+    def get_neighbors(self, cell: Cell) -> List[Tuple[str, Cell]]:
+
+        candidates: Dict[str, Tuple[int, int]] = {
+            "N": (cell.x, cell.y - 1),
+            "E": (cell.x + 1, cell.y),
+            "S": (cell.x, cell.y + 1),
+            "W": (cell.x - 1, cell.y),
+        }
+        return [
+            (direction, self.cells[y][x])
+            for direction, (x, y) in candidates.items()
+            if self.in_bounds(x, y)
+        ]
+
+    def open_wall(self, cell: Cell, neighbor: Cell, direction: str) -> None:
+
+        cell.walls[direction] = True
+        neighbor.walls[OPPOSITE[direction]] = True
+
+    def close_wall(self, cell: Cell, neighbor: Cell, direction: str) -> None:
+
+        cell.walls[direction] = False
+        neighbor.walls[OPPOSITE[direction]] = False
+from .cell import Cell
+from .grid import Grid
+from .generator import MazeGenerator
+from .writer import MazeWriter
+
+__all__ = ["Cell", "Grid", "MazeGenerator", "MazeWriter"]
+from __future__ import annotations
+
+from pathlib import Path
+
+from .generator import MazeGenerator
+from .writer import MazeWriter
+
+
+def main() -> None:
+    mg = MazeGenerator(
+        width=25,
+        height=15,
+        seed=None,
+        perfect=False,
+        entry_point=(0, 0),
+        exit_point=(24, 14),
+    )
+    mg.generate()
+
+    directions = mg.solve()
+    print(f"Solution length: {len(directions)}")
+    print(
+        f"Solution directions: {directions[:80]}{'...' if len(directions) > 80 else ''}"
+    )
+
+    print("\nASCII maze (with solution path):")
+    mg.afficher_ascii(show_path=mg.solution_path)
+
+    out = Path("maze_output.txt")
+    MazeWriter(mg, str(out)).write()
+    print(f"\nWrote: {out.resolve()}")
+
+    c00 = mg.grid.get_cell(0, 0)
+    print(f"\nEntry cell hex: {c00.to_hex()} (Cell.to_hex sanity check)")
+    print(f"Entry cell walls: {c00.walls}")
+
+
+if __name__ == "__main__":
+    main()
+from __future__ import annotations
+
+from maze.generator import MazeGenerator
+
+
+class MazeWriter:
+    def __init__(self, maze: MazeGenerator, output_path: str) -> None:
+
+        self.maze: MazeGenerator = maze
+        self.output_path: str = output_path
+
+    def write(self) -> None:
+
+        directions: str = self.maze.solve()
+
+        with open(self.output_path, "w", encoding="utf-8") as f:
+            for row in self.maze.grid.cells:
+                f.write("".join(cell.to_hex() for cell in row) + "\n")
+
+            f.write("\n")
+
+            entry_x, entry_y = self.maze.entry_point
+            exit_x, exit_y = self.maze.exit_point
+            f.write(f"{entry_x},{entry_y}\n")
+            f.write(f"{exit_x},{exit_y}\n")
+
+            f.write(directions + "\n")
