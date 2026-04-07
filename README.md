@@ -2,7 +2,7 @@
 
 
 # A-Maze-ing
-![DEMO](./maze.webm)
+![DEMO](./maze.gif)
 
 
 ## Description
