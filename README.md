@@ -97,12 +97,12 @@ The maze is generated using an **iterative DFS** with an explicit stack (no actu
    - If no unvisited neighbors remain, pop the cell (backtrack).
 3. Repeat until all cells are visited.
 
-**Imperfect mode** (`PERFECT=False`) runs DFS first, then randomly breaks ~10% of remaining walls — filtered to avoid creating any open 3×3 square region, which would look like a hole rather than a loop.
+**Imperfect mode** (`PERFECT=False`) runs DFS first, then randomly breaks ~10% of remaining walls , filtered to avoid creating any open 3×3 square region, which would look like a hole rather than a loop.
 
 ### Why DFS?
 
 - **Simplicity:** The algorithm is easy to reason about, implement correctly, and test.
-- **Quality:** DFS produces mazes with long, winding corridors and relatively few dead ends — aesthetically interesting and non-trivial to solve by hand.
+- **Quality:** DFS produces mazes with long, winding corridors and relatively few dead ends , aesthetically interesting and non-trivial to solve by hand.
 - **Guaranteed perfect maze:** Every cell is reachable, and there is exactly one path between any two cells (before imperfect mode).
 - **Controllable with a seed:** Deterministic output makes debugging and testing straightforward.
 
@@ -180,19 +180,25 @@ Every maze with `WIDTH ≥ 11` and `HEIGHT ≥ 7` has the digits "42" stamped in
 
 ---
 
-## Reusable Components
-
-The codebase is deliberately decoupled. The following parts can be reused independently:
-
+## Files:
+---
 | Module | What it does |
-|---|---|---|
-| `maze/cell.py` — `Cell` | Represents a single grid cell with directional walls and a `to_hex()` encoder |
-| `maze/grid.py` — `Grid` | 2D grid of `Cell` objects with `open_wall`, `close_wall`, `get_neighbors` | 
-| `maze/generator.py` — `MazeGenerator` | Full generation + BFS solver, no UI dependency |
-| `maze/writer.py` — `MazeWriter` | Serializes any `MazeGenerator` to the hex file format |
+|---|---|
+| `maze/cell.py` , `Cell` | Represents a single grid cell with directional walls and a `to_hex()` encoder |
+| `maze/grid.py` , `Grid` | 2D grid of `Cell` objects with `open_wall`, `close_wall`, `get_neighbors` | 
+| `maze/generator.py` ,`MazeGenerator` | Full generation + BFS solver, no UI dependency |
+| `maze/writer.py` , `MazeWriter` | Serializes any `MazeGenerator` to the hex file format |
 | `config/loader.py` | Parses and validates the `.txt` config file |
-| `display/animator.py` — `Animator` | All animation state and strategy logic, zero curses dependency |
+| `display/animator.py` , `Animator` | All animation state and strategy logic, zero curses dependency |
 | `display/ui_utils.py` | Stateless curses helpers (`create_win_with_panel`, `center_text_win`) |
+| `display/display.py`| Takes over displaying everything |
+| `display/ui.py`| It is for user interface, (cool stuff)|
+| `display/menu`| Takes over the menu keys, options|
+| `Makefile`| To run things|
+| `README.md`| For Documentation|
+| `a_maze_ing.py`| the entry point and the main function to run everything|
+| `file.txt`| The hex-encoded maze and path directions, entry/exit coordinates|
+
 
 The `maze/` package has **no dependency on `display/`**
 
@@ -209,19 +215,19 @@ The `maze/` package has **no dependency on `display/`**
 
 ### Tools used
 
-- **Python 3 + curses** — standard library only for the UI layer
-- **mypy** — static type checking (all modules are fully annotated)
-- **flake8** — style linting
-- **pdb** — debugging via `make debug`
-- **Git** — version control and collaboration
+- **Python 3 + curses** , standard library only for the UI layer
+- **mypy** , static type checking (all modules are fully annotated)
+- **flake8** , style linting
+- **pdb** , debugging via `make debug`
+- **Git** , version control and collaboration
 - **AI assistance:** 
 ---
 
 ## Resources
 
-- [Maze generation algorithms — Wikipedia](https://en.wikipedia.org/wiki/Maze_generation_algorithm)
-- [Depth-first search — Wikipedia](https://en.wikipedia.org/wiki/Depth-first_search)
-- [Breadth-first search — Wikipedia](https://en.wikipedia.org/wiki/Breadth-first_search)
-- [Jamis Buck — Maze generation in depth (blog series)](https://weblog.jamisbuck.org/2011/2/7/maze-generation-algorithm-recap)
+- [Maze generation algorithms , Wikipedia](https://en.wikipedia.org/wiki/Maze_generation_algorithm)
+- [Depth-first search , Wikipedia](https://en.wikipedia.org/wiki/Depth-first_search)
+- [Breadth-first search , Wikipedia](https://en.wikipedia.org/wiki/Breadth-first_search)
+- [Jamis Buck , Maze generation in depth (blog series)](https://weblog.jamisbuck.org/2011/2/7/maze-generation-algorithm-recap)
 - [Python curses documentation](https://docs.python.org/3/library/curses.html)
 - [Python curses HOWTO](https://docs.python.org/3/howto/curses.html)

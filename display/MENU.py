@@ -1,9 +1,6 @@
 """
 display/menu.py
 Menu state, selector values, and navigation logic.
-
-Rules
------
 """
 
 from __future__ import annotations

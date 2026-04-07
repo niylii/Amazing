@@ -1,9 +1,6 @@
 """
 display/animator.py
 Pure animation logic — no curses dependency, fully testable.
-
-Responsibilities
-----------------
 """
 
 from __future__ import annotations

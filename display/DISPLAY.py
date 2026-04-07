@@ -1,11 +1,7 @@
 """
 display/display.py
 Owns only drawing and window management.
-
-Responsibilities
-----------------
-
-fro: win.addstr() callers.
+for: win.addstr() callers.
 """
 
 from __future__ import annotations
