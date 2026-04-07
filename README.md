@@ -2,6 +2,8 @@
 
 
 # A-Maze-ing
+![DEMO](./maze.webm)
+
 
 ## Description
 
