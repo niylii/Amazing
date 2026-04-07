@@ -11,7 +11,6 @@ from __future__ import annotations
 import curses
 from enum import Enum, auto
 from typing import Callable # noqa25
-import sys
 
 
 # Actions the menu can emit
@@ -22,7 +21,7 @@ class Action(Enum):
     OPEN_CONFIG = auto()
     OPEN_CUSTOM = auto()
     BACK = auto()
-    EXIT = lambda: sys.exit(0)
+    EXIT = auto()
 
 
 # Menu
@@ -112,14 +111,15 @@ class Menu:
 
     def _rebuild_config_items(self) -> None:
         c = self.config
+
         self.config_items = [
-            (f"width : {c.get('width', '?')}",                         "button"),
-            (f"height : {c.get('height', '?')}",                       "button"),
-            (f"entry : {c.get('entry', '?')}",                         "button"),
-            (f"exit : {c.get('exit', '?')}",                           "button"),
-            ("perfect",                                               "selector"),
-            (f"seed : {c.get('seed') if c.get('seed') else 'random'}", "button"),
-            ("back",                                                   "button"),
+            (f"width : {c.get('width', '?')}",   "button"),
+            (f"height : {c.get('height', '?')}", "button"),
+            (f"entry : {c.get('entry', '?')}",   "button"),
+            (f"exit : {c.get('exit', '?')}",     "button"),
+            ("perfect",                        "selector"),
+            (f"seed : {c.get('seed') or 'random'}", "button"),
+            ("back",                             "button"),
         ]
         if self.state == "config":
             self.current_items = self.config_items

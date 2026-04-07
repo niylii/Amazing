@@ -136,10 +136,10 @@ class UI:
     # Input processing
     def _process_input(self) -> None:
         # toggle nodelay based on animation state
-        animating = self.animator.maze_is_animating or {
-            self.animator.path_is_animating}
+        option1 = self.animator.maze_is_animating
+        option2 = self.animator.path_is_animating
+        animating = option1 or option2
         self.display.menu_win.nodelay(animating)
-
         try:
             key = self.display.menu_win.getch()
         except curses.error:

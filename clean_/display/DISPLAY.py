@@ -120,15 +120,13 @@ class Display:
         center_text_win(
             self.help_win,
             "KEYS:\n"
+            "-----\n"
             "space : toggles maze animation\n"
             "arrows: navigate up/down - left/right - swipe choises\n"
             "enter: is for entering values (for bottons only)\n"
             "cntl + C: Amazing says goodbye! lol\n"
             "CONFIG INSTRUCTIONS:\n"
-            "width/height: integer > 0  (e.g. 20)\n"
-            "entry/exit:* x,y  where x < width, y < height\n"
-            "     * top-left is 0,0  (e.g. 0,0)\n"
-            "           * entry and exit must be different\n"
+            "--------------------\n"
             "seed: integer 1-500, or type: random\n"
             "⚠  press generate after any config change\n"
         )

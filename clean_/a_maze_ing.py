@@ -37,8 +37,8 @@ def main() -> None:
     except KeyboardInterrupt:
         print("AMAZING SAID GOOD BYE")
         sys.exit(0)
-    except SystemExit:
-        raise
+    # except SystemExit:
+    #     raise
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

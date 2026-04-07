@@ -32,14 +32,14 @@ InvalidEntryError     – file content is invalid
 
 def load_config(argv: list[str]) -> Dict[str, Any]:
     if len(argv) != 2:
-        raise InvalidArgumentError("Usage: python3 main.py config.txt")
+        raise InvalidArgumentError("Usage: python3 a_maze_ing.py config.txt")
 
     filename: str = argv[1]
     _, ext = os.path.splitext(filename)
 
     if ext != ".txt":
         raise InvalidFileError(
-            "Configuration file must be plain text (e.g. config.txt)."
+            "Configuration file must be plain text (file.txt)."
         )
 
     return validate(filename)
@@ -106,9 +106,11 @@ def _parse_positive_int(key: str, value: str) -> int:
         n = int(value)
     except ValueError:
         raise InvalidEntryError(
-            f"{key} must be an integer, got {value!r}")
+            f"[BAD INPUT!] {key} must be \"KEY=VALUE\""
+            f" and value must be a positive integer\n got {value!r}")
     if n <= 0 or n >= 50:
-        raise InvalidEntryError(f"{key} must be positive, got {n}")
+        raise InvalidEntryError(
+            f"{key} must be positive integer between 0 and 50, got {n}")
     return n
 
 
@@ -117,7 +119,8 @@ def _parse_int(key: str, value: str) -> int:
         return int(value)
     except ValueError:
         raise InvalidEntryError(
-            f"{key} must be an integer, got {value!r}")
+            f"[BAD INPUT!] {key} must be \"KEY=VALUE\""
+            f" and value must be a positive integer\n got {value!r}")
 
 
 def _parse_bool(key: str, value: str) -> bool:
@@ -138,7 +141,7 @@ def _parse_coord(key: str, value: str) -> tuple[int, int]:
         return (int(parts[0].strip()), int(parts[1].strip()))
     except ValueError:
         raise InvalidEntryError(
-            f"{key} must be a coordinate like '3,4', got {value!r}"
+            f"{key} must be positive coordinate like '3,4', got {value!r}"
         )
 
 
