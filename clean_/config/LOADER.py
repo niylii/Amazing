@@ -1,0 +1,151 @@
+"""
+config/loader.py
+Configuration file parsing and validation.
+"""
+
+from __future__ import annotations
+import os
+from typing import Any, Dict
+
+
+class InvalidArgumentError(ValueError):
+    pass
+
+
+class InvalidFileError(ValueError):
+    pass
+
+
+class InvalidEntryError(ValueError):
+    pass
+
+
+"""
+Parse sys.argv, validate the config file, and return a config dict.
+Raises:
+------
+InvalidArgumentError  – wrong number of CLI arguments
+InvalidFileError      – file has wrong extension or cannot be read
+InvalidEntryError     – file content is invalid
+"""
+
+
+def load_config(argv: list[str]) -> Dict[str, Any]:
+    if len(argv) != 2:
+        raise InvalidArgumentError("Usage: python3 a_maze_ing.py config.txt")
+
+    filename: str = argv[1]
+    _, ext = os.path.splitext(filename)
+
+    if ext != ".txt":
+        raise InvalidFileError(
+            "Configuration file must be plain text (file.txt)."
+        )
+
+    return validate(filename)
+
+
+def validate(filename: str) -> Dict[str, Any]:
+    """
+    Read "filename" and return a validated config dict with keys:
+        WIDTH, HEIGHT, SEED, PERFECT, ENTRY, EXIT, OUTPUT_FILE
+    """
+    try:
+        with open(filename) as fh:
+            lines = fh.readlines()
+    except OSError as exc:
+        raise InvalidFileError(
+            f"Cannot read '{filename}': {exc}") from exc
+
+    config: Dict[str, Any] = {}
+
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if "=" not in line:
+            raise InvalidEntryError(
+                f"Malformed line (missing '='): {line!r}")
+
+        key, _, value = line.partition("=")
+        key = key.strip().upper()
+        value = value.strip()
+
+        if key == "WIDTH":
+            config["WIDTH"] = _parse_positive_int(key, value)
+        elif key == "HEIGHT":
+            config["HEIGHT"] = _parse_positive_int(key, value)
+        elif key == "SEED":
+            rd = "random"
+            v = value
+            k = key
+            config["SEED"] = None if value.lower() == rd else _parse_int(k, v)
+        elif key == "PERFECT":
+            config["PERFECT"] = _parse_bool(key, value)
+        elif key == "ENTRY":
+            config["ENTRY"] = _parse_coord(key, value)
+        elif key == "EXIT":
+            config["EXIT"] = _parse_coord(key, value)
+        elif key == "OUTPUT_FILE":
+            config["OUTPUT_FILE"] = value
+        else:
+            raise InvalidEntryError(f"Unknown key: {key!r}")
+
+    _require_keys(
+        config, ["WIDTH", "HEIGHT", "ENTRY", "EXIT", "OUTPUT_FILE"])
+
+    config.setdefault("SEED",    None)
+    config.setdefault("PERFECT", True)
+
+    return config
+
+
+def _parse_positive_int(key: str, value: str) -> int:
+    try:
+        n = int(value)
+    except ValueError:
+        raise InvalidEntryError(
+            f"[BAD INPUT!] {key} must be \"KEY=VALUE\""
+            f" and value must be a positive integer\n got {value!r}")
+    if n <= 0 or n >= 50:
+        raise InvalidEntryError(
+            f"{key} must be positive integer between 0 and 50, got {n}")
+    return n
+
+
+def _parse_int(key: str, value: str) -> int:
+    try:
+        return int(value)
+    except ValueError:
+        raise InvalidEntryError(
+            f"[BAD INPUT!] {key} must be \"KEY=VALUE\""
+            f" and value must be a positive integer\n got {value!r}")
+
+
+def _parse_bool(key: str, value: str) -> bool:
+    v = value.lower()
+    if v in ("true", "yes", "1", "on"):
+        return True
+    if v in ("false", "no", "0", "off"):
+        return False
+    raise InvalidEntryError(
+        f"{key} must be a boolean (true/false), got {value!r}")
+
+
+def _parse_coord(key: str, value: str) -> tuple[int, int]:
+    try:
+        parts = value.split(",")
+        if len(parts) != 2:
+            raise ValueError
+        return (int(parts[0].strip()), int(parts[1].strip()))
+    except ValueError:
+        raise InvalidEntryError(
+            f"{key} must be positive coordinate like '3,4', got {value!r}"
+        )
+
+
+def _require_keys(config: dict, keys: list[str]) -> None:
+    for k in keys:
+        if k not in config:
+            raise InvalidEntryError(f"Required key missing: {k}")
