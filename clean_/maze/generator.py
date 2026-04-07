@@ -56,9 +56,11 @@ class MazeGenerator:
     def display_42(self) -> None:
 
         if self.width < 11 or self.height < 7:
-            need = f"(needs 12x8, "
+            need = "(needs 12x8, "
             got = f"got {self.width}x{self.height})"
-            self.pattern_42_warning = f"⚠  Maze too small for '42' pattern " + need + got
+            self.pattern_42_warning = (
+                f"⚠  Maze too small for '42' pattern "
+                f"(need: {need}, got: {got})")
             return  # grid too small to display the pattern
         self.pattern_42_warning = ""
 

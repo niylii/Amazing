@@ -132,7 +132,7 @@ class Animator:
     def _strategy_random(self) -> list[tuple[int, int]]:
         maze = self.maze
         coords = [(x, y) for y in range(maze.height)
-                    for x in range(maze.width)]
+                  for x in range(maze.width)]
         self.maze_animation_step_number = 5
         random.shuffle(coords)
         return coords
@@ -140,14 +140,14 @@ class Animator:
     def _strategy_line_by_line(self) -> list[tuple[int, int]]:
         maze = self.maze
         coords = [(x, y) for y in range(maze.height)
-                    for x in range(maze.width)]
+                  for x in range(maze.width)]
         self.maze_animation_step_number = maze.width
         return coords
 
     def _strategy_cell_by_cell(self) -> list[tuple[int, int]]:
         maze = self.maze
         coords = [(x, y) for y in range(maze.height)
-                    for x in range(maze.width)]
+                  for x in range(maze.width)]
         self.maze_animation_step_number = 1
         return coords
 

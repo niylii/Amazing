@@ -107,7 +107,7 @@ def _parse_positive_int(key: str, value: str) -> int:
     except ValueError:
         raise InvalidEntryError(
             f"{key} must be an integer, got {value!r}")
-    if n <= 0:
+    if n <= 0 or n >= 50:
         raise InvalidEntryError(f"{key} must be positive, got {n}")
     return n
 

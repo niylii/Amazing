@@ -9,9 +9,9 @@ import curses
 import curses.panel
 import sys
 
-from display.DISPLAY  import Display
+from display.DISPLAY import Display
 from display.ANIMATOR import Animator
-from display.MENU     import Action, Menu
+from display.MENU import Action, Menu
 
 
 class UI:
@@ -19,13 +19,13 @@ class UI:
 
     def __init__(self, stdscr: "curses._CursesWindow", maze) -> None:
         self.stdscr = stdscr
-        self.maze   = maze
+        self.maze = maze
         self.path: str = maze.solve()
 
-        # sub-components 
-        self.display  = Display(stdscr)
+        # sub-components
+        self.display = Display(stdscr)
         self.animator = Animator(maze)
-        self.menu     = Menu({
+        self.menu = Menu({
             "width":  maze.width,
             "height": maze.height,
             "entry":  maze.entry_point,
@@ -49,7 +49,7 @@ class UI:
                 self.display.resize_windows()
 
             # check if maze fits in the maze window (not full terminal)
-            needed_cols = self.maze.width  * 2 + 1
+            needed_cols = self.maze.width * 2 + 1
             needed_rows = self.maze.height * 2 + 1 + 3
             maze_fits = (
                 needed_cols <= self.display.maze_width and
@@ -58,6 +58,8 @@ class UI:
 
             if not maze_fits:
                 self.display.error_mod = True
+            else:
+                self.display.error_mod = False
 
             if not self.display.error_mod:
                 self.display.popup_panel.hide()
@@ -114,9 +116,12 @@ class UI:
                     center_text_win(
                         self.display.error_popup_win,
                         f"Oh oh ! Terminal too small!\n"
-                        f"Maze needs : {needed_cols} cols x {needed_rows} rows\n"
-                        f"Terminal is: {self.display.maze_width} cols x {self.display.maze_height} rows\n"
-                        f"Please Ctr+C then resize your terminal and regenerate.",
+                        f"Maze needs : {needed_cols} cols x {needed_rows} "
+                        f"rows\n"
+                        f"Terminal is: {self.display.maze_width} cols x "
+                        f"{self.display.maze_height} rows\n"
+                        f"Please Ctr+C then resize your terminal and "
+                        "regenerate.",
                     )
                 except curses.error:
                     pass
@@ -128,11 +133,11 @@ class UI:
             self._process_input()
             curses.napms(30)
 
-
     # Input processing
     def _process_input(self) -> None:
         # toggle nodelay based on animation state
-        animating = self.animator.maze_is_animating or self.animator.path_is_animating
+        animating = self.animator.maze_is_animating or {
+            self.animator.path_is_animating}
         self.display.menu_win.nodelay(animating)
 
         try:
@@ -142,7 +147,7 @@ class UI:
         if key == -1:
             return
 
-        # input-popup mode 
+        # input-popup mode
         if self.menu.input_mode:
             if getattr(self, '_skip_next_enter', False):
                 self._skip_next_enter = False
@@ -171,7 +176,7 @@ class UI:
                         pass
             return
 
-        #  global shortcuts 
+        #  global shortcuts
         if key == ord(' '):
             self.animator.toggle_animation = not self.animator.toggle_animation
             return
@@ -183,7 +188,7 @@ class UI:
         if key == curses.KEY_RESIZE:
             return
 
-        #  delegate to menu 
+        #  delegate to menu
         action = self.menu.handle_key(key)
 
         # check if menu just entered input mode

@@ -224,20 +224,20 @@ class Display:
                 ch = cell_char if (x % 2 == 0 or y % 2 == 0) else ' '
                 try:
                     mw.addstr(start_y + y, start_x + x, ch,
-                               curses.color_pair(cell_color)
-                                    if ch == cell_char else curses.A_NORMAL)
+                              curses.color_pair(cell_color)
+                              if ch == cell_char else curses.A_NORMAL)
                 except curses.error:
                     pass
 
         # apply animation steps (reveal passages)
         for i in range(
-            min(animator.maze_animation_step, len(animator.maze_timeline))):
+                min(animator.maze_animation_step, len(animator.maze_timeline))
+                ):
             for (rel_y, rel_x) in animator.maze_timeline[i]:
                 try:
                     mw.addstr(start_y + rel_y, start_x + rel_x, " ")
                 except curses.error:
                     pass
-
 
         # force-clear 42 pattern
         for (cx, cy) in maze._pattern_42:
@@ -246,12 +246,11 @@ class Display:
             try:
                 mw.addstr(
                     start_y + real_y, start_x + real_x,
-                    cell_char, curses.color_pair(8)|curses.A_BOLD)
+                    cell_char, curses.color_pair(8) | curses.A_BOLD)
             except curses.error:
-                        pass
+                pass
 
-
-        # entry / exit markers 
+        # entry / exit markers
         def cell_screen(cx: int, cy: int) -> tuple[int, int]:
             return start_x + cx * 2 + 1, start_y + cy * 2 + 1
 
@@ -265,9 +264,9 @@ class Display:
         except curses.error:
             pass
 
-        # status bar 
+        # status bar
         anim_field = f"[animation {toggle_animation}]"
-        seed_field  = f"[seed={maze.seed}]"
+        seed_field = f"[seed={maze.seed}]"
         try:
             mw.addstr(self.maze_height - 1, 1, "infos:")
             mw.addstr(self.maze_height - 1, 8, anim_field,
@@ -292,7 +291,7 @@ class Display:
         mw = self.maze_win
         start_x = (self.maze_width - (maze.width * 2 + 1)) // 2
         start_y = 2
-        #♛
+        # ♛
         cell_char = "▚"
         path_color = (walls_color_idx + 3) % 7 or 1
 
@@ -339,8 +338,11 @@ class Display:
 
         for i, (label, _kind, selected) in enumerate(menu.render_items()):
             prefix = "> " if selected else "  "
-            attr   = curses.A_REVERSE | curses.A_BOLD if selected else curses.A_NORMAL
-            p_attr = curses.A_BLINK | (curses.A_REVERSE if selected else curses.A_NORMAL)
+            base_attr = curses.A_REVERSE | curses.A_BOLD
+            attr = base_attr if selected else curses.A_NORMAL
+
+            reverse_attr = curses.A_REVERSE if selected else curses.A_NORMAL
+            p_attr = curses.A_BLINK | reverse_attr
             try:
                 mw.addstr(i + 2, 2, prefix, p_attr)
                 mw.addstr(i + 2, 4, label,  attr)
@@ -374,7 +376,6 @@ class Display:
             self.create_input_popup("")
             self.create_help_win()
             self.create_error_popup()
-            self.error_mod = True
         except curses.error:
             self.create_error_popup()
             self.error_mod = True
