@@ -20,7 +20,8 @@ def main() -> None:
     directions = mg.solve()
     print(f"Solution length: {len(directions)}")
     print(
-        f"Solution directions: {directions[:80]}{'...' if len(directions) > 80 else ''}"
+        f"Solution directions: {directions[:80]}"
+        f"{'...' if len(directions) > 80 else ''}"
     )
 
     print("\nASCII maze (with solution path):")

@@ -10,19 +10,19 @@ from __future__ import annotations
 
 import curses
 from enum import Enum, auto
-from typing import Callable
+from typing import Callable # noqa25
 import sys
 
 
 # Actions the menu can emit
 class Action(Enum):
-    NONE         = auto()
-    GENERATE     = auto()
-    SHOW_PATH    = auto()
-    OPEN_CONFIG  = auto()
-    OPEN_CUSTOM  = auto()
-    BACK         = auto()
-    EXIT         = lambda: sys.exit(0)
+    NONE = auto()
+    GENERATE = auto()
+    SHOW_PATH = auto()
+    OPEN_CONFIG = auto()
+    OPEN_CUSTOM = auto()
+    BACK = auto()
+    EXIT = lambda: sys.exit(0)
 
 
 # Menu
@@ -33,7 +33,7 @@ class Menu:
     """
 
     def __init__(self, maze_config: dict) -> None:
-        # selector data & indexes 
+        # selector data & indexes
         self.selectors_data: dict[str, list] = {
             "animation":   [
                 "line by line",
@@ -43,30 +43,33 @@ class Menu:
                 "spread",
                 "oil effect",
             ],
-            "walls color": ["white", "cyan", "blue", "green", "red", "yellow", "magenta"],
+            "walls color": ["white", "cyan", "blue", "green", "red",
+                            "yellow", "magenta"],
             "perfect":    ["on", "off"],
         }
-        self.selectors_indexes: dict[str, int] = {k: 0 for k in self.selectors_data}
+        self.selectors_indexes: dict[str, int] = {
+            k: 0 for k in self.selectors_data}
 
-        # config (mirrors maze parameters) 
+        # config (mirrors maze parameters)
         self.config: dict = dict(maze_config)
 
-        #  menu state 
+        #  menu state
         self.state: str = "MENU"
         self.selected_index: int = 0
 
-        #  input-popup state 
+        #  input-popup state
         self.input_mode: bool = False
         self.input_source: str = ""
         self.pending_action: Action = Action.NONE
 
-        # build menus 
+        # build menus
         self._build_menus()
 
     # Properties : convenient single-value accessors
     @property
     def current_animation(self) -> str:
-        return self.selectors_data["animation"][self.selectors_indexes["animation"]]
+        return self.selectors_data["animation"][
+            self.selectors_indexes["animation"]]
 
     @property
     def walls_color_index(self) -> int:
@@ -74,8 +77,8 @@ class Menu:
 
     @property
     def perfect(self) -> bool:
-        return self.selectors_data["perfect"][self.selectors_indexes["perfect"]] == "on"
-
+        return self.selectors_data["perfect"][self.selectors_indexes["perfect"]
+                                              ] == "on"
 
     # Menu structure
     def _build_menus(self) -> None:
@@ -100,7 +103,7 @@ class Menu:
         self.custom_items: list[tuple[str, str]] = [
             ("animation",   "selector"),
             ("walls color", "selector"),
-            ("perfect",     "selector"), 
+            ("perfect",     "selector"),
             ("seed",        "button"),
             ("back",        "button"),
         ]
@@ -139,7 +142,7 @@ class Menu:
             return Action.NONE
         items = self.current_items
         name, kind = items[self.selected_index]
-        #  vertical navigation 
+        #  vertical navigation
         if key == curses.KEY_UP:
             self.selected_index = (self.selected_index - 1) % len(items)
             return Action.NONE
@@ -160,7 +163,7 @@ class Menu:
                 ) % len(self.selectors_data[name])
             return Action.NONE
 
-        #  button enter 
+        #  button enter
         if key in (curses.KEY_ENTER, ord('\n'), 10, 13):
             return self._activate(name)
 
@@ -257,7 +260,6 @@ class Menu:
     def cancel_input(self) -> None:
         self.input_mode = False
 
-
     # Internal helpers
     def _parse_coords(self, s: str, editing: str = "") -> tuple[int, int]:
         try:
@@ -267,7 +269,10 @@ class Menu:
             x, y = int(parts[0].strip()), int(parts[1].strip())
             if (x, y) in (self.config.get("entry"), self.config.get("exit")):
                 return (-1, -1)
-            if x >= self.config.get("width", 0) or y >= self.config.get("height", 0):
+            if (
+                x >= self.config.get("width", 0)
+                or y >= self.config.get("height", 0)
+            ):
                 return (-1, -1)
             if x < 0 or y < 0:
                 return (-1, -1)
