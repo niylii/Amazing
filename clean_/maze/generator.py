@@ -237,55 +237,78 @@ class MazeGenerator:
         return self._solution_cache
 
 
-# #just for testing and understanding
+# # just for testing and understanding
 #     def afficher_ascii(
 #             self,
 #             show_path: Optional[List[Tuple[int, int]]] = None,
-#         ) -> None:
-# path_set: Set[Tuple[int, int]] = set(show_path) if
-# show_path else set()
+#             ) -> None:
+#         path_set: Set[Tuple[int, int]] = (
+#             set(show_path) if show_path else set()
+#             )
 
-#             for y in range(self.height):
-#                 top = ""
-#                 for x in range(self.width):
-#                     cell = self.grid.get_cell(x, y)
-#                     top += "+---" if not cell.walls["N"] else "+   "
-#                 print(top + "+")
+#         for y in range(self.height):
+#             top = ""
+#             for x in range(self.width):
+#                 cell = self.grid.get_cell(x, y)
+#                 top += "+---" if not cell.walls["N"] else "+   "
+#             print(top + "+")
 
-#                 middle = ""
-#                 for x in range(self.width):
-#                     cell = self.grid.get_cell(x, y)
-#                     west = "|" if not cell.walls["W"] else " "
-
-#                     if   (x, y) == self.entry_point:  content = " E "
-#                     elif (x, y) == self.exit_point:   content = " X "
-#                     elif (x, y) in self._pattern_42:  content = "###"
-#                     elif (x, y) in path_set:          content = " . "
-#                     else:                             content = "   "
-
-#                     middle += west + content
-#                 print(middle + "|")
-
+#             middle = ""
+#             for x in range(self.width):
+#                 cell = self.grid.get_cell(x, y)
+#                 west = "|" if not cell.walls["W"] else " "
+#                 if (x, y) == self.entry_point:
+#                     content = " E "
+#                 elif (x, y) == self.exit_point:
+#                     content = " X "
+#                 elif (x, y) in self._pattern_42:
+#                     content = "###"
+#                 elif (x, y) in path_set:
+#                     content = " . "
+#                 else:
+#                     content = "   "
+#                 middle += west + content
+#             print(middle + "|")
 #             print("+---" * self.width + "+")
 
 
-# if __name__ == "__main__":
+# # from __future__ import annotations # noqa 25
 
-#     width, height = 25, 15
-#     seed = 42
-#     perfect = True,
-#     entry = (0, 0)
-#     exit_ = (width - 1, height - 1)
+# from pathlib import Path # noqa 25
 
+# from .generator import MazeGenerator # noqa 25
+# from .writer import MazeWriter # noqa 25
+
+
+# def main() -> None:
 #     mg = MazeGenerator(
-#         width=width,
-#         height=height,
-#         seed=seed,
-#         perfect=perfect,
-#         entry_point=entry,
-#         exit_point=exit_,
+#         width=25,
+#         height=15,
+#         seed=None,
+#         perfect=False,
+#         entry_point=(0, 0),
+#         exit_point=(24, 14),
 #     )
 #     mg.generate()
 
-#     mg.solve()
+#     directions = mg.solve()
+#     print(f"Solution length: {len(directions)}")
+#     print(
+#         f"Solution directions: {directions[:80]}"
+#         f"{'...' if len(directions) > 80 else ''}"
+#     )
+
+#     print("\nASCII maze (with solution path):")
 #     mg.afficher_ascii(show_path=mg.solution_path)
+
+#     out = Path("maze_output.txt")
+#     MazeWriter(mg, str(out)).write()
+#     print(f"\nWrote: {out.resolve()}")
+
+#     c00 = mg.grid.get_cell(0, 0)
+#     print(f"\nEntry cell hex: {c00.to_hex()} (Cell.to_hex sanity check)")
+#     print(f"Entry cell walls: {c00.walls}")
+
+
+# if __name__ == "__main__":
+#     main()
