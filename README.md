@@ -48,11 +48,16 @@ python3 a_maze_ing.py config.txt
 
 ### Other Makefile targets
 
- `make run`: Run with default config 
- `make install`: Install dependencies via pip 
- `make debug` : Run under `pdb` debugger 
- `make lint` : Run `flake8` + `mypy` (standard) 
- `make lint-strict` : Run `mypy --strict` 
+ `make run`: Run with default config
+
+ `make install`: Install dependencies via pip
+
+ `make debug` : Run under `pdb` debugger
+
+ `make lint` : Run `flake8` + `mypy` (standard)
+
+ `make lint-strict` : Run `mypy --strict`
+
  `make clean`: Remove `__pycache__` and `.pyc` files 
 
 
@@ -63,14 +68,20 @@ Each line follows the format `KEY=VALUE`.
 
 ### Required keys
 `x` is the column, `y` is the row
+
 `WIDTH` : integer, 0–50 | Number of columns in the maze
+
 `HEIGHT` : integer, 0–50 | Number of rows in the maze
+
 `ENTRY` : `x,y` coordinate | Entry point (must be within bounds)
+
 `EXIT` : `x,y` coordinate | Exit point (must differ from entry)
+
 `OUTPUT_FILE` : string | Path for the hex-encoded output file
 
 ### Optional keys
-`SEED` : integer or `random` | seed for reproducible mazes 
+`SEED` : integer or `random` | seed for reproducible mazes
+
 `PERFECT` : boolean (`true`/`false`) | if `false` extra walls are broken to create loops.
 
 ### Example `config.txt`
