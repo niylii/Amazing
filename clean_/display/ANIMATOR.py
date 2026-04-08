@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import random
 import time
-from collections import deque   # noqa25
+from collections import deque   # noqa: F401
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:

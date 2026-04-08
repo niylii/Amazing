@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import curses
 from enum import Enum, auto
-from typing import Callable # noqa25
+from typing import Any
 
 
 # Actions the menu can emit
@@ -28,9 +28,9 @@ class Menu:
     Returns Action values; never touches the screen.
     """
 
-    def __init__(self, maze_config: dict) -> None:
+    def __init__(self, maze_config: dict[Any, Any]) -> None:
         # selector data & indexes
-        self.selectors_data: dict[str, list] = {
+        self.selectors_data: dict[str, list[Any]] = {
             "animation":   [
                 "line by line",
                 "random"
@@ -43,7 +43,7 @@ class Menu:
             k: 0 for k in self.selectors_data}
 
         # config (mirrors maze parameters)
-        self.config: dict = dict(maze_config)
+        self.config: dict[Any, Any] = dict(maze_config)
 
         #  menu state
         self.state: str = "MENU"
@@ -59,7 +59,7 @@ class Menu:
 
     # Properties : convenient single-value accessors
     @property
-    def current_animation(self) -> str:
+    def current_animation(self) -> Any:
         return self.selectors_data["animation"][
             self.selectors_indexes["animation"]]
 
@@ -68,7 +68,7 @@ class Menu:
         return self.selectors_indexes["walls color"]
 
     @property
-    def perfect(self) -> bool:
+    def perfect(self) -> Any:
         return self.selectors_data["perfect"][self.selectors_indexes["perfect"]
                                               ] == "on"
 
